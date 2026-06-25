@@ -1,0 +1,9 @@
+.venv/
+#.vscode/
+__pycache__/
+*.pyc
+.env
+uploads/
+*.log
+*.sqlite3
+.claude/

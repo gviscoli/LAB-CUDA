@@ -1,0 +1,55 @@
+# ============================================================
+# LAB-CUDA — Dipendenze Python
+# ============================================================
+# INSTALLAZIONE IN ORDINE:
+#
+# STEP 1 — PyTorch CUDA (manuale, prima di tutto):
+#   pip install torch==2.6.0+cu124 torchvision \
+#       --index-url https://download.pytorch.org/whl/cu124
+#
+# STEP 2 — CuPy per CUDA 12.x:
+#   pip install cupy-cuda12x
+#
+# STEP 3 — Resto:
+#   pip install -r requirements.txt
+# ============================================================
+
+# --- Calcolo GPU ---
+cupy-cuda12x>=13.0.0        # NumPy su GPU — https://docs.cupy.dev/
+numba>=0.60.0               # JIT + kernel CUDA in Python
+                            # https://numba.readthedocs.io/en/stable/cuda/
+
+# --- Calcolo CPU (baseline) ---
+numpy>=1.26.0
+scipy>=1.13.0               # FFT, linear algebra, signal processing
+
+# --- ML Kernels (Lab 04) ---
+# torch già installato al STEP 1
+triton>=3.0.0               # kernel GPU in Python stile OpenAI
+                            # https://triton-lang.org/
+
+# --- Graph (Lab 02) ---
+networkx>=3.3               # grafi CPU baseline
+# cuGraph: installare da RAPIDS (vedi lab02/README.md)
+
+# --- Visualizzazione e benchmark ---
+matplotlib>=3.9.0
+seaborn>=0.13.0
+plotly>=5.22.0
+pandas>=2.2.0
+tqdm>=4.66.0
+
+# --- Notebook ---
+jupyterlab>=4.2.0
+ipywidgets>=8.1.0
+ipympl>=0.9.4               # matplotlib interattivo in Jupyter
+
+# --- Utility ---
+rich>=13.7.1
+python-dotenv>=1.0.1
+pyyaml>=6.0.1
+psutil>=6.0.0               # monitor CPU/RAM
+
+# --- HPC portabilità (Fase 2) ---
+mpi4py>=3.1.6               # MPI per cluster HPC
+                            # https://mpi4py.readthedocs.io/
