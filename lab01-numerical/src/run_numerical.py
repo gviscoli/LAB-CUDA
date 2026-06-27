@@ -175,7 +175,7 @@ def lab_stencil_numba(N: int = 4096):
     rprint(f"\n[bold cyan]Stencil 2D Numba CUDA (shared memory) — {N}x{N}[/bold cyan]")
 
     try:
-        from numba import cuda
+        from numba import cuda, float32 as nb_float32
         import math
 
         BLOCK = 16
@@ -189,7 +189,7 @@ def lab_stencil_numba(N: int = 4096):
             by = cuda.blockIdx.y
 
             # Shared memory con halo (bordo di 1 cella)
-            tile = cuda.shared.array(shape=(BLOCK + 2, BLOCK + 2), dtype=np.float32)
+            tile = cuda.shared.array(shape=(BLOCK + 2, BLOCK + 2), dtype=nb_float32)
 
             i = by * BLOCK + ty
             j = bx * BLOCK + tx
