@@ -110,9 +110,13 @@ def lab_navier_stokes(N: int = 256, steps: int = 200):
     # Parametri fisici
     rho = 1.0    # densità
     nu  = 0.01   # viscosità cinematica (Re = U*L/nu = 1*1/0.01 = 100)
-    dt  = 0.001
     dx = dy = 1.0 / (N - 1)
+    # dt stabile: CFL_diff = nu*dt/dx^2 ≤ 0.45, CFL_adv = dt/dx ≤ 0.9
+    dt = min(0.45 * dx**2 / nu, 0.9 * dx)
     nit = 20     # iterazioni Poisson per la pressione
+    cfl_diff = nu * dt / dx**2
+    cfl_adv  = dt / dx
+    rprint(f"  dt={dt:.2e}, CFL_diff={cfl_diff:.3f} (≤0.45), CFL_adv={cfl_adv:.3f} (≤0.9)")
 
     def build_fields():
         u = np.zeros((N, N), dtype=np.float32)   # velocità x
@@ -178,7 +182,10 @@ def lab_navier_stokes(N: int = 256, steps: int = 200):
         u[0, :]  = 0.0
         u[:, 0]  = 0.0
         u[:, -1] = 0.0
-        v[:] = 0.0
+        v[0, :]  = 0.0   # pareti: solo i bordi, non l'interno
+        v[-1, :] = 0.0
+        v[:, 0]  = 0.0
+        v[:, -1] = 0.0
 
         return u, v, p
 
@@ -240,7 +247,10 @@ def lab_navier_stokes(N: int = 256, steps: int = 200):
                 u[0, :]  = 0.0
                 u[:, 0]  = 0.0
                 u[:, -1] = 0.0
-                v[:] = 0.0
+                v[0, :]  = 0.0
+                v[-1, :] = 0.0
+                v[:, 0]  = 0.0
+                v[:, -1] = 0.0
 
             cp.cuda.Stream.null.synchronize()
             return u, v, p
