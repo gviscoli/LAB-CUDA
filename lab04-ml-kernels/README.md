@@ -49,9 +49,9 @@ Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
 
 | Kernel | CPU (ms) | GPU (ms) | Speedup | Note |
 |--------|----------|----------|---------|------|
-| MatMul-Numba (2048×2048, tiled) | 20.98 | 7.21 | **2.9x** — 2.38 TFLOPS (3% picco) | vedi nota |
-| Conv2D cuDNN (batch=16, 224×224) | 82.80 | 2.95 | **28.1x** | |
-| Self-Attention (seq=1024, d=512) | 126.69 | 3.65 | **34.7x** | Flash Attention: ❌ |
+| MatMul-Numba (2048×2048, tiled) | 22.03 | 7.02 | **3.1x** — 2.45 TFLOPS (3% picco) | vedi nota |
+| Conv2D cuDNN (batch=16, 224×224) | 89.25 | 2.97 | **30.1x** | |
+| Self-Attention (seq=1024, d=512) | 131.16 | 3.76 | **34.9x** | Flash Attention: ❌ |
 
 **Nota MatMul-Numba**: lo speedup contenuto (2.9x, 3% del picco teorico) è atteso per un kernel Numba scritto in Python — non raggiunge l'efficienza di cuBLAS perché manca di ottimizzazioni avanzate come double-buffering, prefetch e warp-level tiling. Il confronto è intenzionale: mostra il gap tra un kernel didattico e una libreria vendor-ottimizzata (cuBLAS raggiunge 80-90% del picco).
 
