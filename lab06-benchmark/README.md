@@ -60,11 +60,11 @@ python lab06-benchmark/src/run_benchmark.py
 
 ## Output generato
 
-```
-outputs/
-├── lab06_cpu_vs_gpu.png      ← grafico a barre CPU vs GPU (scala log) + speedup
-└── lab06_roofline.png        ← roofline model con scatter degli algoritmi
-```
+I grafici vengono salvati automaticamente in `lab06-benchmark/outputs/` ad ogni esecuzione.
+
+![Benchmark CPU vs GPU](outputs/lab06_complete_benchmark.png)
+
+![Roofline Model RTX 4080](outputs/lab06_roofline.png)
 
 ### Console output
 

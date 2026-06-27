@@ -283,10 +283,11 @@ def main():
         from plotter import plot_cpu_vs_gpu, plot_roofline
         valid = [r for r in results if r.gpu_ms > 0 and r.speedup > 0]
         if valid:
+            _out = Path(__file__).resolve().parent.parent / "outputs"
             plot_cpu_vs_gpu(valid,
                 title="LAB-CUDA — Benchmark Completo CPU vs GPU RTX 4080",
-                save_path="../outputs/lab06_complete_benchmark.png")
-            plot_roofline(save_path="../outputs/lab06_roofline.png")
+                save_path=str(_out / "lab06_complete_benchmark.png"))
+            plot_roofline(save_path=str(_out / "lab06_roofline.png"))
     except Exception as e:
         rprint(f"[dim]Grafici: {e}[/dim]")
 
