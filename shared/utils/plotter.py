@@ -22,6 +22,7 @@ def plot_cpu_vs_gpu(
     results: List[BenchmarkResult],
     title: str = "CPU vs GPU Performance",
     save_path: str = None,
+    show: bool = False,
 ):
     """Bar chart comparativo CPU vs GPU con speedup annotato."""
     names    = [r.name for r in results]
@@ -75,7 +76,10 @@ def plot_cpu_vs_gpu(
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
         print(f"Salvato: {save_path}")
 
-    plt.show()
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
     return fig
 
 
@@ -84,6 +88,7 @@ def plot_roofline(
     peak_bandwidth_gbs: float = 716.8,  # RTX 4080 memory bandwidth GB/s
     points: List[dict] = None,
     save_path: str = None,
+    show: bool = False,
 ):
     """
     Roofline Model per RTX 4080.
@@ -150,5 +155,8 @@ def plot_roofline(
         plt.savefig(save_path, dpi=150, bbox_inches="tight")
         print(f"Roofline salvato: {save_path}")
 
-    plt.show()
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
     return fig

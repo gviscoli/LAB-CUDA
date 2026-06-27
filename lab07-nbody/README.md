@@ -44,16 +44,33 @@ Il plot viene salvato automaticamente in `lab07-nbody/outputs/lab07_benchmark.pn
 
 ---
 
-## Risultati attesi
+## Risultati misurati
 
-Hardware target: Intel Core i9 | RTX 4080 16GB | Windows 11
+Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
 
-| Algoritmo | CPU (ms) | GPU (ms) | Speedup | Note |
-|-----------|----------|----------|---------|------|
-| N-Body BF (N=4096) | da misurare | da misurare | ~100x | CuPy full N×N |
-| N-Body Numba (N=4096) | da misurare | da misurare | ~80x | Tiled kernel |
+### CPU vs GPU — N=4096 corpi
 
-**Nota**: lo speedup atteso varia in base alla saturazione dei core GPU. Per N piccoli (512) il lancio kernel ha overhead dominante; per N=4096 la GPU è completamente saturata e lo speedup è massimo.
+| Algoritmo | CPU (ms) | GPU (ms) | Speedup | GFLOPS |
+|-----------|----------|----------|---------|--------|
+| N-Body BF (CuPy) | 339.31 | 4.76 | **71.3x** | 91.7 |
+| N-Body Numba tiled | 335.92 | 0.42 | **792.9x** | 1029.6 |
+
+Il kernel Numba tiled raggiunge **1 TFLOPS effettivi** grazie al riuso in shared memory — 11× più veloce del kernel CuPy pur operando sulla stessa GPU.
+
+### Scaling Analysis — Speedup vs N
+
+| N | CPU (ms) | GPU (ms) | Speedup | GFLOPS |
+|---|----------|----------|---------|--------|
+| 512 | 5.4 | 0.33 | 16.1x | 20.4 |
+| 1,024 | 21.3 | 0.35 | 61.5x | 78.5 |
+| 2,048 | 84.7 | 0.55 | 153.2x | 197.1 |
+| 4,096 | 334.6 | 5.00 | 67.0x | 87.3 |
+
+Il picco di speedup è a N=2048 (153×). A N=4096 con CuPy lo speedup scende (67×) perché la matrice N×N completa supera la L2 cache GPU e diventa memory-bound; il kernel Numba tiled compensa proprio questo problema.
+
+### Nota sull'occupancy Numba
+
+Con N=4096 e TILE=256, la grid ha soli 16 blocchi — Numba emette un `NumbaPerformanceWarning` di bassa occupancy. Aumentare N a 8192+ satura completamente tutti gli SM della RTX 4080 e porta lo speedup verso 500–1000×.
 
 ---
 
