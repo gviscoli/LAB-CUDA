@@ -43,14 +43,17 @@ python lab04-ml-kernels/src/run_kernels.py
 
 ---
 
-## Output atteso
+## Risultati misurati
 
-```
-[MatMul naïve]       GPU:  320 ms  |  12.4 TFLOPS  |  15% peak
-[MatMul tiled]       GPU:   95 ms  |  41.8 TFLOPS  |  51% peak
-[Conv2D cuDNN]       GPU:   28 ms  |  cuDNN: Winograd
-[Self-Attention]     GPU:   62 ms  |  Flash Attention: YES
-```
+Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
+
+| Kernel | CPU (ms) | GPU (ms) | Speedup | Note |
+|--------|----------|----------|---------|------|
+| MatMul-Numba (2048×2048, tiled) | 20.90 | 7.27 | **2.9x** — 2.58 TFLOPS (3% picco) | vedi nota |
+| Conv2D cuDNN (batch=16, 224×224) | 92.10 | 2.95 | **31.3x** | |
+| Self-Attention (seq=1024, d=512) | 130.40 | 3.69 | **35.3x** | Flash Attention: ✅ |
+
+**Nota MatMul-Numba**: lo speedup contenuto (2.9x, 3% del picco teorico) è atteso per un kernel Numba scritto in Python — non raggiunge l'efficienza di cuBLAS perché manca di ottimizzazioni avanzate come double-buffering, prefetch e warp-level tiling. Il confronto è intenzionale: mostra il gap tra un kernel didattico e una libreria vendor-ottimizzata (cuBLAS raggiunge 80-90% del picco).
 
 ---
 

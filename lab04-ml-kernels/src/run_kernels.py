@@ -217,8 +217,9 @@ def lab_attention(batch: int = 8, seq_len: int = 1024,
 
             # Flash Attention check
             try:
-                with torch.cuda.amp.autocast():
-                    with torch.backends.cuda.sdp_kernel(enable_flash=True):
+                from torch.nn.attention import sdpa_kernel, SDPBackend
+                with torch.amp.autocast('cuda'):
+                    with sdpa_kernel(SDPBackend.FLASH_ATTENTION):
                         _ = torch.nn.functional.scaled_dot_product_attention(
                             x_gpu.view(batch, n_heads, seq_len, d_model//n_heads),
                             x_gpu.view(batch, n_heads, seq_len, d_model//n_heads),
@@ -269,8 +270,8 @@ def main():
         )
     console.print(table)
 
-    rprint("\n[dim]💡 Per kernel custom più veloci esplora OpenAI Triton:[/dim]")
-    rprint("[dim]   pip install triton | https://triton-lang.org/[/dim]")
+    rprint("\n[dim]💡 Triton (OpenAI) permette kernel GPU custom più veloci di Numba.[/dim]")
+    rprint("[dim]   ⚠️  Triton non supporta Windows nativo — richiede Linux o WSL2.[/dim]")
 
 
 if __name__ == "__main__":
