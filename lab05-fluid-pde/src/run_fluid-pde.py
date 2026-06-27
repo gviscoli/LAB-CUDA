@@ -95,11 +95,15 @@ def lab_heat_equation(N: int = 1024, steps: int = 500, alpha: float = 0.01):
 # 2. Navier-Stokes 2D — Lid-Driven Cavity
 # ──────────────────────────────────────────────────────────────
 
-def lab_navier_stokes(N: int = 256, steps: int = 200):
+def lab_navier_stokes(N: int = 64, steps: int = 200):
     """
     Navier-Stokes 2D incomprimibile — Lid-Driven Cavity.
     Schema: proiezione di Chorin (pressure-velocity splitting).
-    Re = 100 (regime laminare stabile).
+    Re = 100 (regime laminare).
+
+    Nota sul dimensionamento: il solver Jacobi per la pressione converge in
+    O(N) iterazioni. Con N piccolo (64) e nit=50 il metodo è stabile.
+    Con N grande (256+) servirebbero solver più efficienti (multigrid, CG).
 
     Applicazione HPC: CFD, aerodinamica, meteorologia.
     Riferimento: Barba & Forsyth, "CFD Python" (12 passi)
@@ -111,41 +115,22 @@ def lab_navier_stokes(N: int = 256, steps: int = 200):
     rho = 1.0    # densità
     nu  = 0.01   # viscosità cinematica (Re = U*L/nu = 1*1/0.01 = 100)
     dx = dy = 1.0 / (N - 1)
-    # dt stabile: CFL_diff = nu*dt/dx^2 ≤ 0.45, CFL_adv = dt/dx ≤ 0.9
-    dt = min(0.45 * dx**2 / nu, 0.9 * dx)
-    nit = 20     # iterazioni Poisson per la pressione
+    # dt stabile: CFL_diff ≤ 0.35 (conservativo per termini nonlineari), CFL_adv ≤ 0.9
+    dt = min(0.35 * dx**2 / nu, 0.9 * dx)
+    nit = 50     # iterazioni Jacobi per pressione — O(N) necessarie per convergenza
     cfl_diff = nu * dt / dx**2
     cfl_adv  = dt / dx
-    rprint(f"  dt={dt:.2e}, CFL_diff={cfl_diff:.3f} (≤0.45), CFL_adv={cfl_adv:.3f} (≤0.9)")
+    rprint(f"  dt={dt:.2e}, CFL_diff={cfl_diff:.3f} (≤0.35), CFL_adv={cfl_adv:.3f} (≤0.9)")
 
-    def build_fields():
-        u = np.zeros((N, N), dtype=np.float32)   # velocità x
-        v = np.zeros((N, N), dtype=np.float32)   # velocità y
-        p = np.zeros((N, N), dtype=np.float32)   # pressione
+    def build_fields_np():
+        # float64: necessario per stabilità numerica con schema esplicito
+        u = np.zeros((N, N), dtype=np.float64)
+        v = np.zeros((N, N), dtype=np.float64)
+        p = np.zeros((N, N), dtype=np.float64)
         return u, v, p
 
-    def pressure_poisson(p, b, dx, dy, nit):
-        """Risoluzione equazione di Poisson per la pressione."""
-        for _ in range(nit):
-            pn = p.copy()
-            p[1:-1, 1:-1] = (
-                ((pn[1:-1, 2:] + pn[1:-1, :-2]) * dy**2 +
-                 (pn[2:, 1:-1] + pn[:-2, 1:-1]) * dx**2) /
-                (2 * (dx**2 + dy**2)) -
-                dx**2 * dy**2 / (2 * (dx**2 + dy**2)) * b[1:-1, 1:-1]
-            )
-            # Neumann BC per pressione
-            p[:, -1] = p[:, -2]
-            p[0, :]  = p[1, :]
-            p[:, 0]  = p[:, 1]
-            p[-1, :] = 0
-        return p
-
-    def ns_step_cpu(u, v, p, dx, dy, dt, nu, rho, nit):
-        un = u.copy(); vn = v.copy()
-
-        # Source term (divergenza del campo velocità)
-        b = np.zeros_like(u)
+    def b_term(u, v, dx, dy, dt, rho, xp=np):
+        b = xp.zeros_like(u)
         b[1:-1, 1:-1] = (
             rho * (1/dt *
                    ((u[1:-1, 2:] - u[1:-1, :-2]) / (2*dx) +
@@ -155,10 +140,24 @@ def lab_navier_stokes(N: int = 256, steps: int = 200):
                         (v[1:-1, 2:] - v[1:-1, :-2]) / (2*dx)) -
                    ((v[2:, 1:-1] - v[:-2, 1:-1]) / (2*dy))**2)
         )
+        return b
 
-        p = pressure_poisson(p, b, dx, dy, nit)
+    def pressure_poisson(p, b, dx, dy, nit, xp=np):
+        for _ in range(nit):
+            pn = p.copy()
+            p[1:-1, 1:-1] = (
+                ((pn[1:-1, 2:] + pn[1:-1, :-2]) * dy**2 +
+                 (pn[2:, 1:-1] + pn[:-2, 1:-1]) * dx**2) /
+                (2 * (dx**2 + dy**2)) -
+                dx**2 * dy**2 / (2 * (dx**2 + dy**2)) * b[1:-1, 1:-1]
+            )
+            p[:, -1] = p[:, -2]
+            p[0, :]  = p[1, :]
+            p[:, 0]  = p[:, 1]
+            p[-1, :] = 0
+        return p
 
-        # Aggiorna velocità
+    def velocity_update(u, v, un, vn, p, dx, dy, dt, nu, rho):
         u[1:-1, 1:-1] = (
             un[1:-1, 1:-1] -
             un[1:-1, 1:-1] * dt/dx * (un[1:-1, 1:-1] - un[1:-1, :-2]) -
@@ -167,7 +166,6 @@ def lab_navier_stokes(N: int = 256, steps: int = 200):
             nu * (dt/dx**2 * (un[1:-1, 2:] - 2*un[1:-1, 1:-1] + un[1:-1, :-2]) +
                   dt/dy**2 * (un[2:, 1:-1] - 2*un[1:-1, 1:-1] + un[:-2, 1:-1]))
         )
-
         v[1:-1, 1:-1] = (
             vn[1:-1, 1:-1] -
             un[1:-1, 1:-1] * dt/dx * (vn[1:-1, 1:-1] - vn[1:-1, :-2]) -
@@ -176,30 +174,27 @@ def lab_navier_stokes(N: int = 256, steps: int = 200):
             nu * (dt/dx**2 * (vn[1:-1, 2:] - 2*vn[1:-1, 1:-1] + vn[1:-1, :-2]) +
                   dt/dy**2 * (vn[2:, 1:-1] - 2*vn[1:-1, 1:-1] + vn[:-2, 1:-1]))
         )
+        return u, v
 
-        # Boundary conditions: lid-driven cavity
-        u[-1, :] = 1.0   # lid superiore si muove a velocità 1
-        u[0, :]  = 0.0
-        u[:, 0]  = 0.0
-        u[:, -1] = 0.0
-        v[0, :]  = 0.0   # pareti: solo i bordi, non l'interno
-        v[-1, :] = 0.0
-        v[:, 0]  = 0.0
-        v[:, -1] = 0.0
-
-        return u, v, p
+    def apply_bc(u, v):
+        u[-1, :] = 1.0; u[0, :] = 0.0; u[:, 0] = 0.0; u[:, -1] = 0.0
+        v[0, :]  = 0.0; v[-1, :] = 0.0; v[:, 0] = 0.0; v[:, -1] = 0.0
 
     def cpu_fn():
-        u, v, p = build_fields()
+        u, v, p = build_fields_np()
         for _ in range(steps):
-            u, v, p = ns_step_cpu(u, v, p, dx, dy, dt, nu, rho, nit)
+            un = u.copy(); vn = v.copy()
+            b  = b_term(u, v, dx, dy, dt, rho)
+            p  = pressure_poisson(p, b, dx, dy, nit)
+            u, v = velocity_update(u, v, un, vn, p, dx, dy, dt, nu, rho)
+            apply_bc(u, v)
         return u, v, p
 
     with CPUTimer() as t:
         u_f, v_f, p_f = cpu_fn()
 
     rprint(f"  CPU: {t.elapsed_ms:.1f} ms")
-    max_vel = np.sqrt(u_f**2 + v_f**2).max()
+    max_vel = float(np.sqrt(u_f**2 + v_f**2).max())
     rprint(f"  Velocità max: [green]{max_vel:.4f}[/green]")
 
     # GPU version
@@ -207,51 +202,15 @@ def lab_navier_stokes(N: int = 256, steps: int = 200):
         import cupy as cp
 
         def gpu_fn():
-            u = cp.zeros((N, N), dtype=cp.float32)
-            v = cp.zeros((N, N), dtype=cp.float32)
-            p = cp.zeros((N, N), dtype=cp.float32)
-
+            u = cp.zeros((N, N), dtype=cp.float64)
+            v = cp.zeros((N, N), dtype=cp.float64)
+            p = cp.zeros((N, N), dtype=cp.float64)
             for _ in range(steps):
                 un = u.copy(); vn = v.copy()
-
-                b = cp.zeros_like(u)
-                b[1:-1, 1:-1] = (
-                    rho * (1/dt *
-                           ((u[1:-1, 2:] - u[1:-1, :-2]) / (2*dx) +
-                            (v[2:, 1:-1] - v[:-2, 1:-1]) / (2*dy)))
-                )
-
-                for _ in range(nit):
-                    pn = p.copy()
-                    p[1:-1, 1:-1] = (
-                        ((pn[1:-1, 2:] + pn[1:-1, :-2]) * dy**2 +
-                         (pn[2:, 1:-1] + pn[:-2, 1:-1]) * dx**2) /
-                        (2*(dx**2+dy**2)) -
-                        dx**2*dy**2/(2*(dx**2+dy**2)) * b[1:-1, 1:-1]
-                    )
-                    p[:, -1] = p[:, -2]
-                    p[0, :]  = p[1, :]
-                    p[:, 0]  = p[:, 1]
-                    p[-1, :] = 0
-
-                u[1:-1, 1:-1] = (
-                    un[1:-1, 1:-1] -
-                    un[1:-1, 1:-1]*dt/dx*(un[1:-1,1:-1]-un[1:-1,:-2]) -
-                    vn[1:-1, 1:-1]*dt/dy*(un[1:-1,1:-1]-un[:-2,1:-1]) -
-                    dt/(2*rho*dx)*(p[1:-1,2:]-p[1:-1,:-2]) +
-                    nu*(dt/dx**2*(un[1:-1,2:]-2*un[1:-1,1:-1]+un[1:-1,:-2]) +
-                        dt/dy**2*(un[2:,1:-1]-2*un[1:-1,1:-1]+un[:-2,1:-1]))
-                )
-
-                u[-1, :] = 1.0
-                u[0, :]  = 0.0
-                u[:, 0]  = 0.0
-                u[:, -1] = 0.0
-                v[0, :]  = 0.0
-                v[-1, :] = 0.0
-                v[:, 0]  = 0.0
-                v[:, -1] = 0.0
-
+                b  = b_term(u, v, dx, dy, dt, rho, xp=cp)
+                p  = pressure_poisson(p, b, dx, dy, nit, xp=cp)
+                u, v = velocity_update(u, v, un, vn, p, dx, dy, dt, nu, rho)
+                apply_bc(u, v)
             cp.cuda.Stream.null.synchronize()
             return u, v, p
 
