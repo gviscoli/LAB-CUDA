@@ -48,15 +48,17 @@ python lab03-montecarlo/src/run_montecarlo.py
 
 ---
 
-## Output atteso
+## Risultati misurati
 
-```
-[Monte Carlo π]   CPU: 2100 ms  |  GPU:  18 ms  |  Speedup: 116x  |  π ≈ 3.14159
-[Black-Scholes]   CPU: 4800 ms  |  GPU:  45 ms  |  Speedup: 107x  |  Price: 8.02
-[Ising Model]     CPU: 9500 ms  |  GPU:  85 ms  |  Speedup: 112x  |  |M| ≈ 0.73
-```
+Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
 
-> Tutti e tre gli algoritmi sono **compute-bound** e embarrassingly parallel: speedup tipicamente > 100×.
+| Algoritmo | CPU (ms) | GPU (ms) | Speedup | Note |
+|-----------|----------|----------|---------|------|
+| Pi-MC (100M campioni) | 1631.60 | 12.75 | **127.9x** | π ≈ 3.141432 |
+| Black-Scholes (10M traj.) | 55821.09 | 679.74 | **82.1x** | Prezzo call: $8.0163 |
+| Ising 2D (1024×1024) | 1079.22 | 1247.70 | **0.9x** | GPU più lento — vedi nota |
+
+**Nota Ising 2D**: lo speedup è < 1 perché l'implementazione CuPy usa operazioni array-level (`roll`, `where`, random) con sincronizzazioni implicite a ogni step Metropolis. L'overhead di lancio kernel e sincronizzazione GPU (×1000 step) supera il guadagno computazionale. Per ottenere speedup reale servirebbe un kernel Numba CUDA custom che esegua tutti gli step in un unico lancio, eliminando i round-trip CPU↔GPU.
 
 ---
 
