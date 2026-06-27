@@ -22,6 +22,45 @@ from rich.console import Console
 
 console = Console()
 
+# ── Numba CUDA kernel (livello modulo) ──────────────────────────────────────
+# cuda.shared.array richiede shape e dtype costanti a compile-time.
+# Il kernel deve stare a livello modulo (non come closure) per consentire
+# a Numba di risolvere queste costanti durante la JIT compilation.
+_STENCIL_BLOCK = 16
+try:
+    from numba import cuda as _numba_cuda, float32 as _nb_f32
+
+    @_numba_cuda.jit
+    def _stencil_kernel(u, out, N):
+        tx = _numba_cuda.threadIdx.x
+        ty = _numba_cuda.threadIdx.y
+        bx = _numba_cuda.blockIdx.x
+        by = _numba_cuda.blockIdx.y
+        # shape = (BLOCK+2, BLOCK+2) con BLOCK=16 → (18, 18)
+        tile = _numba_cuda.shared.array(shape=(18, 18), dtype=_nb_f32)
+        i = by * 16 + ty
+        j = bx * 16 + tx
+        if i < N and j < N:
+            tile[ty + 1, tx + 1] = u[i, j]
+        if tx == 0 and j > 0:
+            tile[ty + 1, 0] = u[i, j - 1]
+        if tx == 15 and j < N - 1:        # BLOCK-1 = 15
+            tile[ty + 1, 17] = u[i, j + 1]  # BLOCK+1 = 17
+        if ty == 0 and i > 0:
+            tile[0, tx + 1] = u[i - 1, j]
+        if ty == 15 and i < N - 1:        # BLOCK-1 = 15
+            tile[17, tx + 1] = u[i + 1, j]  # BLOCK+1 = 17
+        _numba_cuda.syncthreads()
+        if 1 <= i < N - 1 and 1 <= j < N - 1:
+            out[i, j] = (tile[ty,     tx + 1] + tile[ty + 2, tx + 1] +
+                         tile[ty + 1, tx]     + tile[ty + 1, tx + 2] -
+                         4.0 * tile[ty + 1, tx + 1])
+
+    _NUMBA_CUDA_OK = True
+except Exception:
+    _stencil_kernel = None
+    _NUMBA_CUDA_OK = False
+
 
 # ──────────────────────────────────────────────────────────────
 # 1. FFT
