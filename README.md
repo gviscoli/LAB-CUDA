@@ -31,12 +31,15 @@ C:\DATI\Sviluppo\LAB-CUDA\
 ├── lab03-montecarlo/                ← Pi, Black-Scholes, Ising Model
 ├── lab04-ml-kernels/                ← Matmul, Conv2D, Attention custom
 ├── lab05-fluid-pde/                 ← Navier-Stokes, Heat equation
-└── lab06-benchmark/                 ← Confronto CPU vs GPU vs HPC
+├── lab06-benchmark/                 ← Confronto CPU vs GPU vs HPC
+├── lab07-nbody/                     ← N-Body gravitazionale O(N²) + tiled CUDA
+├── lab08-sorting/                   ← Radix sort, Prefix scan, Histogram
+└── lab09-finance/                   ← Portfolio VaR, Greeks MC, Volatility surface
 ```
 
 ---
 
-## I 6 Lab
+## I 9 Lab
 
 | Lab | Dominio | Algoritmi | Tecnologie |
 |-----|---------|-----------|------------|
@@ -44,8 +47,11 @@ C:\DATI\Sviluppo\LAB-CUDA\
 | [**02** — Graph](lab02-graph/README.md) | Graph | BFS, PageRank, Betweenness | CuPy sparse, SciPy |
 | [**03** — Monte Carlo](lab03-montecarlo/README.md) | Monte Carlo | π, Black-Scholes, Ising 2D | CuPy random, Numba |
 | [**04** — ML Kernels](lab04-ml-kernels/README.md) | ML Kernels | MatMul tiled, Conv2D, Attention | Numba CUDA, PyTorch, cuDNN |
-| [**05** — Fluid/PDE](lab05-fluid-pde/README.md) | Fluid/PDE | Heat Equation, Navier-Stokes 2D | CuPy, NumPy |
+| [**05** — Fluid/PDE](lab05-fluid-pde/README.md) | Fluid/PDE | Heat Equation, Navier-Stokes 2D | CuPy, SciPy sparse |
 | [**06** — Benchmark](lab06-benchmark/README.md) | Benchmark | Roofline model, scaling analysis | tutti i precedenti |
+| [**07** — N-Body](lab07-nbody/README.md) | Fisica | N-Body O(N²), tiled CUDA kernel | CuPy, Numba CUDA |
+| [**08** — Sorting](lab08-sorting/README.md) | Primitive | Radix sort, Prefix scan, Histogram | CuPy, Numba |
+| [**09** — Finance](lab09-finance/README.md) | Finanza | Portfolio VaR, Greeks MC, Vol surface | CuPy, SciPy |
 
 ---
 
