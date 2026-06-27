@@ -116,8 +116,9 @@ def lab_navier_stokes(N: int = 64, steps: int = 500):
     rho = 1.0    # densità
     nu  = 0.1    # viscosità cinematica (Re = U*L/nu = 1*1/0.1 = 10)
     dx = dy = 1.0 / (N - 1)
-    # dt stabile: CFL_diff ≤ 0.35, CFL_adv ≤ 0.9
-    dt = min(0.35 * dx**2 / nu, 0.9 * dx)
+    # CFL 2D diffusione: ν·dt/dx² ≤ 0.25 (criterio DIM=2, non 0.5 come DIM=1)
+    # Usiamo 0.20 per margine di sicurezza
+    dt = min(0.20 * dx**2 / nu, 0.5 * dx)
     nit = 50     # iterazioni SOR — sufficiente con omega ottimale
     # SOR optimal omega: ρ_SOR = ω-1 ≈ 0.905 → 50 iter danno errore < 1%
     # Jacobi avrebbe bisogno di ~3800 iter per la stessa convergenza su N=64
@@ -125,7 +126,7 @@ def lab_navier_stokes(N: int = 64, steps: int = 500):
     omega = 2.0 / (1.0 + math.sin(math.pi * dx))
     cfl_diff = nu * dt / dx**2
     cfl_adv  = dt / dx
-    rprint(f"  dt={dt:.2e}, CFL_diff={cfl_diff:.3f} (≤0.35), CFL_adv={cfl_adv:.3f} (≤0.9), SOR ω={omega:.3f}")
+    rprint(f"  dt={dt:.2e}, CFL_diff={cfl_diff:.3f} (≤0.25 per 2D), CFL_adv={cfl_adv:.3f} (≤0.5), SOR ω={omega:.3f}")
 
     def build_fields_np():
         # float64: necessario per stabilità numerica con schema esplicito
