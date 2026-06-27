@@ -52,8 +52,8 @@ Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
 
 | Algoritmo | CPU (ms) | GPU (ms) | Speedup | GFLOPS |
 |-----------|----------|----------|---------|--------|
-| N-Body BF (CuPy) | 339.31 | 4.76 | **71.3x** | 91.7 |
-| N-Body Numba tiled | 335.92 | 0.42 | **792.9x** | 1029.6 |
+| N-Body BF (CuPy) | 338.11 | 4.79 | **70.7x** | 91.2 |
+| N-Body Numba tiled | 342.33 | 0.42 | **809.1x** | 1031.0 |
 
 Il kernel Numba tiled raggiunge **1 TFLOPS effettivi** grazie al riuso in shared memory — 11× più veloce del kernel CuPy pur operando sulla stessa GPU.
 
@@ -61,12 +61,12 @@ Il kernel Numba tiled raggiunge **1 TFLOPS effettivi** grazie al riuso in shared
 
 | N | CPU (ms) | GPU (ms) | Speedup | GFLOPS |
 |---|----------|----------|---------|--------|
-| 512 | 5.4 | 0.33 | 16.1x | 20.4 |
-| 1,024 | 21.3 | 0.35 | 61.5x | 78.5 |
-| 2,048 | 84.7 | 0.55 | 153.2x | 197.1 |
-| 4,096 | 334.6 | 5.00 | 67.0x | 87.3 |
+| 512 | 5.3 | 0.41 | 12.8x | 16.6 |
+| 1,024 | 21.0 | 0.32 | 65.9x | 85.3 |
+| 2,048 | 87.9 | 0.70 | 125.6x | 155.9 |
+| 4,096 | 339.0 | 4.80 | 70.6x | 90.9 |
 
-Il picco di speedup è a N=2048 (153×). A N=4096 con CuPy lo speedup scende (67×) perché la matrice N×N completa supera la L2 cache GPU e diventa memory-bound; il kernel Numba tiled compensa proprio questo problema.
+Il picco di speedup è a N=2048 (125×). A N=4096 con CuPy lo speedup scende (70×) perché la matrice N×N completa supera la L2 cache GPU e diventa memory-bound; il kernel Numba tiled compensa proprio questo problema.
 
 ### Nota sull'occupancy Numba
 
