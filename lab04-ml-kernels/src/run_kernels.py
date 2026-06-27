@@ -215,19 +215,23 @@ def lab_attention(batch: int = 8, seq_len: int = 1024,
                           problem_size=batch*seq_len*d_model, warmup=2, runs=5)
             rprint(f"  {r}")
 
-            # Flash Attention check
+            # Flash Attention check — su Windows PyTorch non è compilato con FA
+            import warnings
             try:
                 from torch.nn.attention import sdpa_kernel, SDPBackend
-                with torch.amp.autocast('cuda'):
-                    with sdpa_kernel(SDPBackend.FLASH_ATTENTION):
-                        _ = torch.nn.functional.scaled_dot_product_attention(
-                            x_gpu.view(batch, n_heads, seq_len, d_model//n_heads),
-                            x_gpu.view(batch, n_heads, seq_len, d_model//n_heads),
-                            x_gpu.view(batch, n_heads, seq_len, d_model//n_heads),
-                        )
-                rprint("  [green]✅ Flash Attention disponibile (RTX 4080 Ada)[/green]")
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    with torch.amp.autocast('cuda'):
+                        with sdpa_kernel(SDPBackend.FLASH_ATTENTION):
+                            _ = torch.nn.functional.scaled_dot_product_attention(
+                                x_gpu.view(batch, n_heads, seq_len, d_model//n_heads),
+                                x_gpu.view(batch, n_heads, seq_len, d_model//n_heads),
+                                x_gpu.view(batch, n_heads, seq_len, d_model//n_heads),
+                            )
+                rprint("  [green]✅ Flash Attention disponibile[/green]")
             except Exception:
-                pass
+                rprint("  [yellow]⚠️  Flash Attention non disponibile "
+                       "(PyTorch Windows non compilato con FA)[/yellow]")
 
             return r
         else:

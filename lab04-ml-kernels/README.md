@@ -49,11 +49,13 @@ Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
 
 | Kernel | CPU (ms) | GPU (ms) | Speedup | Note |
 |--------|----------|----------|---------|------|
-| MatMul-Numba (2048×2048, tiled) | 20.90 | 7.27 | **2.9x** — 2.58 TFLOPS (3% picco) | vedi nota |
-| Conv2D cuDNN (batch=16, 224×224) | 92.10 | 2.95 | **31.3x** | |
-| Self-Attention (seq=1024, d=512) | 130.40 | 3.69 | **35.3x** | Flash Attention: ✅ |
+| MatMul-Numba (2048×2048, tiled) | 20.98 | 7.21 | **2.9x** — 2.38 TFLOPS (3% picco) | vedi nota |
+| Conv2D cuDNN (batch=16, 224×224) | 82.80 | 2.95 | **28.1x** | |
+| Self-Attention (seq=1024, d=512) | 126.69 | 3.65 | **34.7x** | Flash Attention: ❌ |
 
 **Nota MatMul-Numba**: lo speedup contenuto (2.9x, 3% del picco teorico) è atteso per un kernel Numba scritto in Python — non raggiunge l'efficienza di cuBLAS perché manca di ottimizzazioni avanzate come double-buffering, prefetch e warp-level tiling. Il confronto è intenzionale: mostra il gap tra un kernel didattico e una libreria vendor-ottimizzata (cuBLAS raggiunge 80-90% del picco).
+
+**Nota Flash Attention**: non disponibile su Windows. Il binario PyTorch distribuito su Windows non è compilato con Flash Attention — serve Linux o WSL2 con PyTorch compilato da sorgente. La RTX 4080 Ada supporterebbe FA hardware, ma il software non lo espone in questo ambiente.
 
 ---
 
