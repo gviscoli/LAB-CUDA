@@ -215,10 +215,6 @@ def main():
         )
     console.print(table)
 
-    rprint("\n[dim]💡 cuGraph (RAPIDS) offre BFS/PageRank GPU nativo con speedup 10-100x.[/dim]")
-    rprint("[dim]   ⚠️  RAPIDS non supporta Windows nativo — richiede Linux o WSL2.[/dim]")
-    rprint("[dim]   Su Linux/WSL2: pip install cugraph-cu12 --extra-index-url https://pypi.nvidia.com[/dim]")
-    rprint("[dim]   Alternativa zero-setup: Google Colab con GPU runtime (RAPIDS preinstallato).[/dim]")
 
 
 if __name__ == "__main__":

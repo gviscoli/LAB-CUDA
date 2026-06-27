@@ -54,9 +54,9 @@ Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11 — grafo 50.000 nodi
 
 | Algoritmo | CPU (ms) | GPU (ms) | Speedup |
 |-----------|----------|----------|---------|
-| BFS | 11.15 | 1.39 | **8.0x** |
-| PageRank (50 iter.) | 29.56 | 6.97 | **4.2x** |
-| Betweenness Centrality | 2340.95 | N/A | — (solo CPU) |
+| BFS | 13.62 | 1.70 | **8.0x** |
+| PageRank (50 iter.) | 30.27 | 3.27 | **9.3x** |
+| Betweenness Centrality | 57.77 | N/A | — (solo CPU) |
 
 > Gli algoritmi su grafi sono tipicamente **memory-bound**: il vantaggio GPU è contenuto (4–8×) perché la bassa intensità operazionale non satura il picco computazionale ma la banda di memoria. Per speedup elevati usare cuGraph (RAPIDS).
 
