@@ -213,76 +213,34 @@ def lab_stencil_numba(N: int = 4096):
     """
     rprint(f"\n[bold cyan]Stencil 2D Numba CUDA (shared memory) — {N}x{N}[/bold cyan]")
 
-    try:
-        from numba import cuda, float32 as nb_float32
-        import math
-
-        BLOCK = 16
-
-        @cuda.jit
-        def stencil_kernel(u, out, N):
-            """Kernel CUDA con shared memory per stencil 2D a 5 punti."""
-            tx = cuda.threadIdx.x
-            ty = cuda.threadIdx.y
-            bx = cuda.blockIdx.x
-            by = cuda.blockIdx.y
-
-            # Shared memory con halo (bordo di 1 cella)
-            tile = cuda.shared.array(shape=(BLOCK + 2, BLOCK + 2), dtype=nb_float32)
-
-            i = by * BLOCK + ty
-            j = bx * BLOCK + tx
-
-            # Carica in shared memory (incluso halo)
-            if i < N and j < N:
-                tile[ty + 1, tx + 1] = u[i, j]
-
-            # Halo sinistro/destro
-            if tx == 0 and j > 0:
-                tile[ty + 1, 0] = u[i, j - 1]
-            if tx == BLOCK - 1 and j < N - 1:
-                tile[ty + 1, BLOCK + 1] = u[i, j + 1]
-
-            # Halo sopra/sotto
-            if ty == 0 and i > 0:
-                tile[0, tx + 1] = u[i - 1, j]
-            if ty == BLOCK - 1 and i < N - 1:
-                tile[BLOCK + 1, tx + 1] = u[i + 1, j]
-
-            cuda.syncthreads()
-
-            # Applica stencil (evita bordi)
-            if 1 <= i < N - 1 and 1 <= j < N - 1:
-                out[i, j] = (tile[ty, tx + 1] + tile[ty + 2, tx + 1] +
-                             tile[ty + 1, tx] + tile[ty + 1, tx + 2] -
-                             4.0 * tile[ty + 1, tx + 1])
-
-        u_cpu = np.random.randn(N, N).astype(np.float32)
-        u_gpu = cuda.to_device(u_cpu)
-        out_gpu = cuda.device_array_like(u_gpu)
-
-        threads = (BLOCK, BLOCK)
-        blocks  = (math.ceil(N / BLOCK), math.ceil(N / BLOCK))
-
-        def numba_fn():
-            stencil_kernel[blocks, threads](u_gpu, out_gpu, N)
-            cuda.synchronize()
-
-        # Warmup
-        for _ in range(3):
-            numba_fn()
-
-        with GPUTimer() as t:
-            for _ in range(10):
-                numba_fn()
-        gpu_ms = t.elapsed_ms / 10
-
-        rprint(f"  Numba CUDA kernel: [green]{gpu_ms:.2f} ms[/green]")
-        bandwidth = 5 * N * N * 4 / (gpu_ms / 1000) / 1e9
-        rprint(f"  Bandwidth effettiva: [cyan]{bandwidth:.1f} GB/s[/cyan] / 716.8 teorici")
-
-    except ImportError:
+    if not _NUMBA_CUDA_OK:
         rprint("  [yellow]Numba non disponibile[/yellow]")
+        return
+
+    import math
+
+    u_cpu = np.random.randn(N, N).astype(np.float32)
+    u_gpu = _numba_cuda.to_device(u_cpu)
+    out_gpu = _numba_cuda.device_array_like(u_gpu)
+
+    threads = (_STENCIL_BLOCK, _STENCIL_BLOCK)
+    blocks  = (math.ceil(N / _STENCIL_BLOCK), math.ceil(N / _STENCIL_BLOCK))
+
+    def numba_fn():
+        _stencil_kernel[blocks, threads](u_gpu, out_gpu, N)
+        _numba_cuda.synchronize()
+
+    for _ in range(3):
+        numba_fn()
+
+    with GPUTimer() as t:
+        for _ in range(10):
+            numba_fn()
+    gpu_ms = t.elapsed_ms / 10
+
+    rprint(f"  Numba CUDA kernel: [green]{gpu_ms:.2f} ms[/green]")
+    bandwidth = 5 * N * N * 4 / (gpu_ms / 1000) / 1e9
+    rprint(f"  Bandwidth effettiva: [cyan]{bandwidth:.1f} GB/s[/cyan] / 716.8 teorici")
 
 
 # ──────────────────────────────────────────────────────────────
