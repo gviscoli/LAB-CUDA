@@ -139,7 +139,10 @@ def lab_navier_stokes(N: int = 64, steps: int = 500):
             A[k, k] = d
 
     rprint("  Fattorizzazione LU matrice pressione sparse...")
-    solve_p = factorized(A.tocsr())
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        solve_p = factorized(A.tocsc())  # CSC richiesto da splu internamente
 
     def compute_b(u, v):
         b = np.zeros_like(u)
