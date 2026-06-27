@@ -215,14 +215,25 @@ def lab_stencil_numba(N: int = 4096):
 
     if not _NUMBA_CUDA_OK:
         rprint("  [yellow]Numba non disponibile[/yellow]")
-        return
+        return BenchmarkResult("Stencil-Numba", cpu_ms=0)
 
     import math
 
     u_cpu = np.random.randn(N, N).astype(np.float32)
-    u_gpu = _numba_cuda.to_device(u_cpu)
-    out_gpu = _numba_cuda.device_array_like(u_gpu)
 
+    # CPU baseline (stesso operatore di lab_stencil_2d)
+    def cpu_fn():
+        return (u_cpu[:-2, 1:-1] + u_cpu[2:, 1:-1] +
+                u_cpu[1:-1, :-2] + u_cpu[1:-1, 2:] - 4 * u_cpu[1:-1, 1:-1])
+
+    with CPUTimer() as t:
+        for _ in range(3):
+            cpu_fn()
+    cpu_ms = t.elapsed_ms / 3
+
+    # GPU Numba kernel
+    u_gpu   = _numba_cuda.to_device(u_cpu)
+    out_gpu = _numba_cuda.device_array_like(u_gpu)
     threads = (_STENCIL_BLOCK, _STENCIL_BLOCK)
     blocks  = (math.ceil(N / _STENCIL_BLOCK), math.ceil(N / _STENCIL_BLOCK))
 
@@ -238,9 +249,15 @@ def lab_stencil_numba(N: int = 4096):
             numba_fn()
     gpu_ms = t.elapsed_ms / 10
 
-    rprint(f"  Numba CUDA kernel: [green]{gpu_ms:.2f} ms[/green]")
+    speedup   = cpu_ms / gpu_ms
     bandwidth = 5 * N * N * 4 / (gpu_ms / 1000) / 1e9
+    rprint(f"  Stencil-Numba: CPU={cpu_ms:.2f}ms | GPU={gpu_ms:.2f}ms | "
+           f"Speedup=[green]{speedup:.1f}x[/green]")
     rprint(f"  Bandwidth effettiva: [cyan]{bandwidth:.1f} GB/s[/cyan] / 716.8 teorici")
+
+    return BenchmarkResult("Stencil-Numba", cpu_ms=cpu_ms, gpu_ms=gpu_ms,
+                           speedup=speedup, problem_size=N*N,
+                           throughput_gbs=bandwidth)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -258,7 +275,7 @@ def main():
     results.append(lab_fft2d())
     results.append(lab_matmul())
     results.append(lab_stencil_2d())
-    lab_stencil_numba()
+    results.append(lab_stencil_numba())
 
     # Tabella riepilogo
     table = Table(title="\nRiepilogo Speedup GPU vs CPU", header_style="bold magenta")
