@@ -287,7 +287,7 @@ def main():
             plot_cpu_vs_gpu(
                 valid,
                 title="LAB 01 — Numerical: CPU vs GPU",
-                save_path="../outputs/lab01_benchmark.png"
+                save_path=str(Path(__file__).resolve().parent.parent / "outputs" / "lab01_benchmark.png")
             )
     except Exception as e:
         rprint(f"[dim]Grafico non generato: {e}[/dim]")

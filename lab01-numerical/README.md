@@ -49,15 +49,19 @@ python lab01-numerical/src/run_numerical.py
 
 ---
 
-## Output atteso
+## Risultati misurati
 
-```
-[FFT 1D]      CPU: 450 ms  |  GPU:  12 ms  |  Speedup: 37x
-[FFT 2D]      CPU: 890 ms  |  GPU:  35 ms  |  Speedup: 25x
-[DGEMM]       CPU: 8200 ms |  GPU:  95 ms  |  Speedup: 86x  |  48.3 TFLOPS
-[Stencil CuPy]  CPU: 210ms |  GPU:  18 ms  |  BW: 312 GB/s
-[Stencil Numba] CPU: 210ms |  GPU:  11 ms  |  BW: 510 GB/s
-```
+Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
+
+| Algoritmo | CPU (ms) | GPU (ms) | Speedup |
+|-----------|----------|----------|---------|
+| FFT-1D | 150.84 | 0.21 | **718.8x** |
+| FFT-2D | 949.23 | 1.39 | **683.5x** |
+| MatMul (8192×8192) | 1070.71 | 32.06 | **33.4x** — 34.4 TFLOPS (42% del picco) |
+| Stencil-2D (CuPy) | 105.95 | 1.49 | **71.1x** |
+| Stencil-2D (Numba shared mem) | — | — | in corso di validazione |
+
+![LAB 01 — Numerical: CPU vs GPU](outputs/lab01_benchmark.png)
 
 ---
 
