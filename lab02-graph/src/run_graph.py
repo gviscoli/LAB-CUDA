@@ -22,20 +22,25 @@ from rich.console import Console
 console = Console()
 
 
-def generate_graph(n_nodes: int = 100_000, avg_degree: int = 10) -> tuple:
+def generate_graph(n_nodes: int = 100_000, avg_degree: int = 10):
     """
     Genera un grafo random sparso come matrice di adiacenza CSR.
-    Restituisce (row_offsets, col_indices, n_nodes, n_edges) in formato CPU.
+    Usa generazione COO manuale per evitare l'overflow int32 di
+    scipy.sparse.random (n*m > 2^31 con n_nodes >= 46341).
     """
     rprint(f"  Generando grafo: {n_nodes:,} nodi, ~{n_nodes*avg_degree:,} archi...")
-    from scipy.sparse import random as sparse_random, csr_matrix
+    from scipy.sparse import csr_matrix
 
-    density = avg_degree / n_nodes
-    A = sparse_random(n_nodes, n_nodes, density=density, format="csr",
-                      dtype=np.float32)
-    # Rendi simmetrico (grafo non diretto)
-    A = (A + A.T)
+    n_edges = n_nodes * avg_degree
+    rows = np.random.randint(0, n_nodes, size=n_edges, dtype=np.int32)
+    cols = np.random.randint(0, n_nodes, size=n_edges, dtype=np.int32)
+    data = np.ones(n_edges, dtype=np.float32)
+
+    A = csr_matrix((data, (rows, cols)), shape=(n_nodes, n_nodes))
+    # Rendi simmetrico (grafo non diretto) e binarizza
+    A = A + A.T
     A.data[:] = 1.0
+    A.sum_duplicates()
 
     rprint(f"  Archi effettivi: {A.nnz:,}")
     return A
