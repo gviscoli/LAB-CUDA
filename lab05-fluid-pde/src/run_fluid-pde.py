@@ -95,15 +95,16 @@ def lab_heat_equation(N: int = 1024, steps: int = 500, alpha: float = 0.01):
 # 2. Navier-Stokes 2D — Lid-Driven Cavity
 # ──────────────────────────────────────────────────────────────
 
-def lab_navier_stokes(N: int = 64, steps: int = 200):
+def lab_navier_stokes(N: int = 64, steps: int = 500):
     """
     Navier-Stokes 2D incomprimibile — Lid-Driven Cavity.
     Schema: proiezione di Chorin (pressure-velocity splitting).
-    Re = 100 (regime laminare).
+    Re = 10 (regime laminare stabile — caso di riferimento Barba tutorial).
 
-    Nota sul dimensionamento: il solver Jacobi per la pressione converge in
-    O(N) iterazioni. Con N piccolo (64) e nit=50 il metodo è stabile.
-    Con N grande (256+) servirebbero solver più efficienti (multigrid, CG).
+    Nota: con Re=100 (nu=0.01) il gradiente al corner del lid crea un termine
+    sorgente b molto grande che il solver Jacobi esplicito non riesce a correggere
+    in tempo → instabilità esponenziale. Re=10 (nu=0.1) smorza i gradienti e
+    rende il metodo stabile. Per Re alto servono solver impliciti (Crank-Nicolson).
 
     Applicazione HPC: CFD, aerodinamica, meteorologia.
     Riferimento: Barba & Forsyth, "CFD Python" (12 passi)
@@ -113,9 +114,9 @@ def lab_navier_stokes(N: int = 64, steps: int = 200):
 
     # Parametri fisici
     rho = 1.0    # densità
-    nu  = 0.01   # viscosità cinematica (Re = U*L/nu = 1*1/0.01 = 100)
+    nu  = 0.1    # viscosità cinematica (Re = U*L/nu = 1*1/0.1 = 10)
     dx = dy = 1.0 / (N - 1)
-    # dt stabile: CFL_diff ≤ 0.35 (conservativo per termini nonlineari), CFL_adv ≤ 0.9
+    # dt stabile: CFL_diff ≤ 0.35, CFL_adv ≤ 0.9
     dt = min(0.35 * dx**2 / nu, 0.9 * dx)
     nit = 50     # iterazioni Jacobi per pressione — O(N) necessarie per convergenza
     cfl_diff = nu * dt / dx**2
