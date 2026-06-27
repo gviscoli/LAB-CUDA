@@ -200,7 +200,9 @@ def lab_attention(batch: int = 8, seq_len: int = 1024,
                 return mha_cpu(x_cpu, x_cpu, x_cpu)
 
         if torch.cuda.is_available():
-            mha_gpu = mha_cpu.cuda()
+            # Modello GPU separato: .cuda() sposta in-place, quindi mha_cpu
+            # diventerebbe GPU. Creiamo un'istanza indipendente.
+            mha_gpu = nn.MultiheadAttention(d_model, n_heads, batch_first=True).cuda()
             x_gpu   = x_cpu.cuda()
 
             def gpu_fn():
