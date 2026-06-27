@@ -58,7 +58,10 @@ Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11 — grafo 50.000 nodi
 | PageRank (50 iter.) | 30.27 | 3.27 | **9.3x** |
 | Betweenness Centrality | 57.77 | N/A | — (vedi nota) |
 
-> Gli algoritmi su grafi sono tipicamente **memory-bound**: il vantaggio GPU è contenuto (4–8×) perché la bassa intensità operazionale non satura il picco computazionale ma la banda di memoria. Per speedup elevati usare cuGraph (RAPIDS).
+> Gli algoritmi su grafi sono tipicamente **memory-bound**: il vantaggio GPU è contenuto (8–9×) perché la bassa intensità operazionale non satura il picco computazionale ma la banda di memoria.
+
+**Perché Betweenness Centrality non ha risultato GPU?**
+La Betweenness Centrality richiede di eseguire un BFS completo da ogni nodo sorgente e accumulare i contributi lungo i cammini minimi. Questo comporta dipendenze di dati complesse tra i thread (ogni thread deve leggere risultati di altri BFS in corso) che rendono difficile una parallelizzazione efficiente con CuPy sparse. L'implementazione GPU richiederebbe cuGraph (libreria RAPIDS di NVIDIA), che però non è disponibile su Windows nativo — supporta solo Linux e WSL2. Su questa piattaforma rimane quindi solo la versione CPU con SciPy (`shortest_path` su un campione di 10 nodi sorgente).
 
 ---
 
