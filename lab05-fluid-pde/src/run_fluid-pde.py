@@ -97,146 +97,173 @@ def lab_heat_equation(N: int = 1024, steps: int = 500, alpha: float = 0.01):
 
 def lab_navier_stokes(N: int = 64, steps: int = 500):
     """
-    Navier-Stokes 2D incomprimibile — Lid-Driven Cavity.
-    Schema: proiezione di Chorin (pressure-velocity splitting).
-    Re = 10 (regime laminare stabile — caso di riferimento Barba tutorial).
+    Navier-Stokes 2D incomprimibile — Lid-Driven Cavity (Re=100).
+    Schema: proiezione di Chorin con solver diretto per la pressione.
 
-    Nota: con Re=100 (nu=0.01) il gradiente al corner del lid crea un termine
-    sorgente b molto grande che il solver Jacobi esplicito non riesce a correggere
-    in tempo → instabilità esponenziale. Re=10 (nu=0.1) smorza i gradienti e
-    rende il metodo stabile. Per Re alto servono solver impliciti (Crank-Nicolson).
-
-    Applicazione HPC: CFD, aerodinamica, meteorologia.
-    Riferimento: Barba & Forsyth, "CFD Python" (12 passi)
-    https://github.com/barbagroup/CFDPython
+    Il Jacobi/SOR iterativo NON funziona per questo problema: le BCs miste
+    (Neumann su 3 lati, Dirichlet su 1) danno spettro di Jacobi ρ_J≈0.9997 →
+    servono ~4000 iterazioni per convergenza. Con pressione sbagliata il
+    divergence di u si accumula step→step fino a overflow.
+    Fix: scipy.sparse.linalg.factorized → LU esatto, O(1) per step successivi.
     """
     rprint(f"\n[bold cyan]Navier-Stokes 2D Lid-Driven Cavity — {N}x{N}, {steps} step[/bold cyan]")
 
-    # Parametri fisici
-    rho = 1.0    # densità
-    nu  = 0.1    # viscosità cinematica (Re = U*L/nu = 1*1/0.1 = 10)
+    rho = 1.0
+    nu  = 0.01   # Re = U*L/nu = 1*1/0.01 = 100
     dx = dy = 1.0 / (N - 1)
-    # CFL 2D diffusione: ν·dt/dx² ≤ 0.25 (criterio DIM=2, non 0.5 come DIM=1)
-    # Usiamo 0.20 per margine di sicurezza
+    # CFL 2D: ν·dt/(dx²) ≤ 0.25 per diffusione; CFL_adv = u_max·dt/dx ≤ 1
     dt = min(0.20 * dx**2 / nu, 0.5 * dx)
-    nit = 50     # iterazioni SOR — sufficiente con omega ottimale
-    # SOR optimal omega: ρ_SOR = ω-1 ≈ 0.905 → 50 iter danno errore < 1%
-    # Jacobi avrebbe bisogno di ~3800 iter per la stessa convergenza su N=64
-    import math
-    omega = 2.0 / (1.0 + math.sin(math.pi * dx))
     cfl_diff = nu * dt / dx**2
-    cfl_adv  = dt / dx
-    rprint(f"  dt={dt:.2e}, CFL_diff={cfl_diff:.3f} (≤0.25 per 2D), CFL_adv={cfl_adv:.3f} (≤0.5), SOR ω={omega:.3f}")
+    rprint(f"  Re={1/nu:.0f}, dt={dt:.2e}, CFL_diff={cfl_diff:.3f}")
 
-    def build_fields_np():
-        # float64: necessario per stabilità numerica con schema esplicito
-        u = np.zeros((N, N), dtype=np.float64)
-        v = np.zeros((N, N), dtype=np.float64)
-        p = np.zeros((N, N), dtype=np.float64)
-        return u, v, p
+    # ── Sparse pressure matrix (built once, factorized once) ──────────────────
+    # Laplaciano su punti interni (N-2)×(N-2) con BCs incorporate:
+    #   Neumann: bottom (i=0), left (j=0), right (j=N-1)  → ghost cell: p_ghost = p_adj
+    #   Dirichlet: top (i=N-1) → p=0, contribuisce 0 al RHS (valore noto)
+    from scipy.sparse import lil_matrix
+    from scipy.sparse.linalg import factorized
 
-    def b_term(u, v, dx, dy, dt, rho, xp=np):
-        b = xp.zeros_like(u)
-        b[1:-1, 1:-1] = (
-            rho * (1/dt *
-                   ((u[1:-1, 2:] - u[1:-1, :-2]) / (2*dx) +
-                    (v[2:, 1:-1] - v[:-2, 1:-1]) / (2*dy)) -
-                   ((u[1:-1, 2:] - u[1:-1, :-2]) / (2*dx))**2 -
-                   2 * ((u[2:, 1:-1] - u[:-2, 1:-1]) / (2*dy) *
-                        (v[1:-1, 2:] - v[1:-1, :-2]) / (2*dx)) -
-                   ((v[2:, 1:-1] - v[:-2, 1:-1]) / (2*dy))**2)
+    M = N - 2
+    A = lil_matrix((M * M, M * M), dtype=np.float64)
+    for i in range(M):
+        for j in range(M):
+            k = i * M + j
+            d = -2.0 / dx**2 - 2.0 / dy**2
+            if i == 0:    d            += 1.0/dy**2        # Neumann bottom
+            else:          A[k, (i-1)*M+j] = 1.0/dy**2
+            if i < M - 1:  A[k, (i+1)*M+j] = 1.0/dy**2   # top=Dirichlet p=0, nessun contributo
+            if j == 0:    d            += 1.0/dx**2        # Neumann left
+            else:          A[k, i*M+(j-1)] = 1.0/dx**2
+            if j == M - 1: d           += 1.0/dx**2        # Neumann right
+            else:          A[k, i*M+(j+1)] = 1.0/dx**2
+            A[k, k] = d
+
+    rprint("  Fattorizzazione LU matrice pressione sparse...")
+    solve_p = factorized(A.tocsr())
+
+    def compute_b(u, v):
+        b = np.zeros_like(u)
+        b[1:-1, 1:-1] = rho * (
+            (1/dt) * ((u[1:-1,2:]-u[1:-1,:-2])/(2*dx) + (v[2:,1:-1]-v[:-2,1:-1])/(2*dy)) -
+            ((u[1:-1,2:]-u[1:-1,:-2])/(2*dx))**2 -
+            2*((u[2:,1:-1]-u[:-2,1:-1])/(2*dy) * (v[1:-1,2:]-v[1:-1,:-2])/(2*dx)) -
+            ((v[2:,1:-1]-v[:-2,1:-1])/(2*dy))**2
         )
         return b
 
-    def pressure_poisson(p, b, dx, dy, nit, omega, xp=np):
-        # SOR (Successive Over-Relaxation) — converge in O(N) iterazioni
-        # vs Jacobi che richiede O(N²). Per N=64 con omega≈1.905:
-        # errore residuo < 1% dopo 50 iter (vs 82% con Jacobi puro)
-        coeff = dx**2 * dy**2 / (2 * (dx**2 + dy**2))
-        for _ in range(nit):
-            pn = p.copy()
-            p_jac = (
-                ((pn[1:-1, 2:] + pn[1:-1, :-2]) * dy**2 +
-                 (pn[2:, 1:-1] + pn[:-2, 1:-1]) * dx**2) /
-                (2 * (dx**2 + dy**2)) -
-                coeff * b[1:-1, 1:-1]
-            )
-            p[1:-1, 1:-1] = (1.0 - omega) * pn[1:-1, 1:-1] + omega * p_jac
-            p[:, -1] = p[:, -2]
-            p[0, :]  = p[1, :]
-            p[:, 0]  = p[:, 1]
-            p[-1, :] = 0
+    def solve_pressure(p, b):
+        rhs = b[1:-1, 1:-1].flatten()
+        p[1:-1, 1:-1] = solve_p(rhs).reshape((M, M))
+        p[:, -1] = p[:, -2]; p[0, :] = p[1, :]
+        p[:, 0]  = p[:, 1];  p[-1, :] = 0.0
         return p
 
-    def velocity_update(u, v, un, vn, p, dx, dy, dt, nu, rho):
-        u[1:-1, 1:-1] = (
-            un[1:-1, 1:-1] -
-            un[1:-1, 1:-1] * dt/dx * (un[1:-1, 1:-1] - un[1:-1, :-2]) -
-            vn[1:-1, 1:-1] * dt/dy * (un[1:-1, 1:-1] - un[:-2, 1:-1]) -
-            dt/(2*rho*dx) * (p[1:-1, 2:] - p[1:-1, :-2]) +
-            nu * (dt/dx**2 * (un[1:-1, 2:] - 2*un[1:-1, 1:-1] + un[1:-1, :-2]) +
-                  dt/dy**2 * (un[2:, 1:-1] - 2*un[1:-1, 1:-1] + un[:-2, 1:-1]))
+    def velocity_update(u, v, un, vn, p):
+        u[1:-1,1:-1] = (
+            un[1:-1,1:-1] -
+            un[1:-1,1:-1]*dt/dx*(un[1:-1,1:-1]-un[1:-1,:-2]) -
+            vn[1:-1,1:-1]*dt/dy*(un[1:-1,1:-1]-un[:-2,1:-1]) -
+            dt/(2*rho*dx)*(p[1:-1,2:]-p[1:-1,:-2]) +
+            nu*(dt/dx**2*(un[1:-1,2:]-2*un[1:-1,1:-1]+un[1:-1,:-2]) +
+                dt/dy**2*(un[2:,1:-1]-2*un[1:-1,1:-1]+un[:-2,1:-1]))
         )
-        v[1:-1, 1:-1] = (
-            vn[1:-1, 1:-1] -
-            un[1:-1, 1:-1] * dt/dx * (vn[1:-1, 1:-1] - vn[1:-1, :-2]) -
-            vn[1:-1, 1:-1] * dt/dy * (vn[1:-1, 1:-1] - vn[:-2, 1:-1]) -
-            dt/(2*rho*dy) * (p[2:, 1:-1] - p[:-2, 1:-1]) +
-            nu * (dt/dx**2 * (vn[1:-1, 2:] - 2*vn[1:-1, 1:-1] + vn[1:-1, :-2]) +
-                  dt/dy**2 * (vn[2:, 1:-1] - 2*vn[1:-1, 1:-1] + vn[:-2, 1:-1]))
+        v[1:-1,1:-1] = (
+            vn[1:-1,1:-1] -
+            un[1:-1,1:-1]*dt/dx*(vn[1:-1,1:-1]-vn[1:-1,:-2]) -
+            vn[1:-1,1:-1]*dt/dy*(vn[1:-1,1:-1]-vn[:-2,1:-1]) -
+            dt/(2*rho*dy)*(p[2:,1:-1]-p[:-2,1:-1]) +
+            nu*(dt/dx**2*(vn[1:-1,2:]-2*vn[1:-1,1:-1]+vn[1:-1,:-2]) +
+                dt/dy**2*(vn[2:,1:-1]-2*vn[1:-1,1:-1]+vn[:-2,1:-1]))
         )
         return u, v
 
     def apply_bc(u, v):
-        u[-1, :] = 1.0; u[0, :] = 0.0; u[:, 0] = 0.0; u[:, -1] = 0.0
-        v[0, :]  = 0.0; v[-1, :] = 0.0; v[:, 0] = 0.0; v[:, -1] = 0.0
+        # lid last so corners inherit wall (u=0), not lid (u=1)
+        u[0,:]=0; u[:,0]=0; u[:,-1]=0; u[-1,:]=1.0
+        v[0,:]=0; v[-1,:]=0; v[:,0]=0; v[:,-1]=0
 
-    def cpu_fn():
-        u, v, p = build_fields_np()
+    def cpu_ns():
+        u = np.zeros((N, N), dtype=np.float64)
+        v = np.zeros((N, N), dtype=np.float64)
+        p = np.zeros((N, N), dtype=np.float64)
         for _ in range(steps):
-            un = u.copy(); vn = v.copy()
-            b  = b_term(u, v, dx, dy, dt, rho)
-            p  = pressure_poisson(p, b, dx, dy, nit, omega)
-            u, v = velocity_update(u, v, un, vn, p, dx, dy, dt, nu, rho)
+            un, vn = u.copy(), v.copy()
+            b = compute_b(u, v)
+            p = solve_pressure(p, b)
+            u, v = velocity_update(u, v, un, vn, p)
             apply_bc(u, v)
         return u, v, p
 
     with CPUTimer() as t:
-        u_f, v_f, p_f = cpu_fn()
+        u_f, v_f, p_f = cpu_ns()
 
-    rprint(f"  CPU: {t.elapsed_ms:.1f} ms")
+    cpu_ms = t.elapsed_ms
     max_vel = float(np.sqrt(u_f**2 + v_f**2).max())
-    rprint(f"  Velocità max: [green]{max_vel:.4f}[/green]")
+    rprint(f"  CPU: {cpu_ms:.1f} ms  |  velocità max: [green]{max_vel:.4f}[/green]")
 
-    # GPU version
+    # ── GPU: CuPy sparse CG (cupyx) o fallback a SOR con molte iterazioni ────
     try:
         import cupy as cp
+        gpu_ms = None
 
-        def gpu_fn():
-            u = cp.zeros((N, N), dtype=cp.float64)
-            v = cp.zeros((N, N), dtype=cp.float64)
-            p = cp.zeros((N, N), dtype=cp.float64)
-            for _ in range(steps):
-                un = u.copy(); vn = v.copy()
-                b  = b_term(u, v, dx, dy, dt, rho, xp=cp)
-                p  = pressure_poisson(p, b, dx, dy, nit, omega, xp=cp)
-                u, v = velocity_update(u, v, un, vn, p, dx, dy, dt, nu, rho)
-                apply_bc(u, v)
-            cp.cuda.Stream.null.synchronize()
-            return u, v, p
+        try:
+            import cupyx.scipy.sparse as cpsp
+            import cupyx.scipy.sparse.linalg as cpla
+            A_gpu = cpsp.csr_matrix(A.tocsr())
 
-        with GPUTimer() as tg:
-            gpu_fn()
+            def gpu_ns():
+                u = cp.zeros((N, N), dtype=cp.float64)
+                v = cp.zeros((N, N), dtype=cp.float64)
+                p = cp.zeros((N, N), dtype=cp.float64)
+                for _ in range(steps):
+                    un, vn = u.copy(), v.copy()
+                    b = cp.zeros_like(u)
+                    b[1:-1,1:-1] = rho * (
+                        (1/dt)*((u[1:-1,2:]-u[1:-1,:-2])/(2*dx)+(v[2:,1:-1]-v[:-2,1:-1])/(2*dy)) -
+                        ((u[1:-1,2:]-u[1:-1,:-2])/(2*dx))**2 -
+                        2*((u[2:,1:-1]-u[:-2,1:-1])/(2*dy)*(v[1:-1,2:]-v[1:-1,:-2])/(2*dx)) -
+                        ((v[2:,1:-1]-v[:-2,1:-1])/(2*dy))**2
+                    )
+                    rhs = b[1:-1,1:-1].flatten()
+                    p_int, _ = cpla.cg(A_gpu, rhs, tol=1e-8)
+                    p[1:-1,1:-1] = p_int.reshape((M, M))
+                    p[:,-1]=p[:,-2]; p[0,:]=p[1,:]; p[:,0]=p[:,1]; p[-1,:]=0
+                    u[1:-1,1:-1] = (un[1:-1,1:-1] -
+                        un[1:-1,1:-1]*dt/dx*(un[1:-1,1:-1]-un[1:-1,:-2]) -
+                        vn[1:-1,1:-1]*dt/dy*(un[1:-1,1:-1]-un[:-2,1:-1]) -
+                        dt/(2*rho*dx)*(p[1:-1,2:]-p[1:-1,:-2]) +
+                        nu*(dt/dx**2*(un[1:-1,2:]-2*un[1:-1,1:-1]+un[1:-1,:-2]) +
+                            dt/dy**2*(un[2:,1:-1]-2*un[1:-1,1:-1]+un[:-2,1:-1])))
+                    v[1:-1,1:-1] = (vn[1:-1,1:-1] -
+                        un[1:-1,1:-1]*dt/dx*(vn[1:-1,1:-1]-vn[1:-1,:-2]) -
+                        vn[1:-1,1:-1]*dt/dy*(vn[1:-1,1:-1]-vn[:-2,1:-1]) -
+                        dt/(2*rho*dy)*(p[2:,1:-1]-p[:-2,1:-1]) +
+                        nu*(dt/dx**2*(vn[1:-1,2:]-2*vn[1:-1,1:-1]+vn[1:-1,:-2]) +
+                            dt/dy**2*(vn[2:,1:-1]-2*vn[1:-1,1:-1]+vn[:-2,1:-1])))
+                    u[0,:]=0; u[:,0]=0; u[:,-1]=0; u[-1,:]=1.0
+                    v[0,:]=0; v[-1,:]=0; v[:,0]=0; v[:,-1]=0
+                cp.cuda.Stream.null.synchronize()
+                return u, v, p
 
-        speedup = t.elapsed_ms / tg.elapsed_ms
-        rprint(f"  GPU: {tg.elapsed_ms:.1f} ms | Speedup: [green]{speedup:.1f}x[/green]")
+            with GPUTimer() as tg:
+                gpu_ns()
+            gpu_ms = tg.elapsed_ms
+            rprint(f"  GPU (cupyx CG): {gpu_ms:.1f} ms")
 
-        return BenchmarkResult("Navier-Stokes", cpu_ms=t.elapsed_ms,
-                               gpu_ms=tg.elapsed_ms, speedup=speedup,
-                               problem_size=N*N)
+        except Exception as e:
+            rprint(f"  [yellow]GPU sparse CG non disponibile ({type(e).__name__})[/yellow]")
+            rprint("  [dim]NS su GPU richiede loop CUDA custom (Numba) per speedup reale[/dim]")
+
+        if gpu_ms is not None and gpu_ms > 0:
+            speedup = cpu_ms / gpu_ms
+            rprint(f"  Speedup: [green]{speedup:.1f}x[/green]")
+            return BenchmarkResult("Navier-Stokes", cpu_ms=cpu_ms,
+                                   gpu_ms=gpu_ms, speedup=speedup, problem_size=N*N)
 
     except ImportError:
-        return BenchmarkResult("Navier-Stokes", cpu_ms=t.elapsed_ms)
+        pass
+
+    return BenchmarkResult("Navier-Stokes", cpu_ms=cpu_ms)
 
 
 # ──────────────────────────────────────────────────────────────
