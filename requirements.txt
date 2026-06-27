@@ -21,11 +21,11 @@ numba>=0.60.0               # JIT + kernel CUDA in Python
 
 # --- Calcolo CPU (baseline) ---
 numpy>=1.26.0
-scipy>=1.13.0               # FFT, linear algebra, signal processing
+scipy>=1.11.0               # FFT, linear algebra, signal processing
 
 # --- ML Kernels (Lab 04) ---
 # torch già installato al STEP 1
-triton>=3.0.0               # kernel GPU in Python stile OpenAI
+# triton>=3.0.0               # kernel GPU in Python stile OpenAI
                             # https://triton-lang.org/
 
 # --- Graph (Lab 02) ---

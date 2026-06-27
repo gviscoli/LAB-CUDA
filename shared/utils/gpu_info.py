@@ -44,9 +44,12 @@ def check_environment():
                 p = torch.cuda.get_device_properties(i)
                 vram = p.total_memory / (1024**3)
                 rprint(f"  GPU {i}: [cyan]{p.name}[/cyan] | {vram:.1f}GB VRAM | "
-                       f"CUDA {p.major}.{p.minor} | "
-                       f"{p.multi_processor_count} SM | "
-                       f"{p.max_threads_per_block} thread/block")
+                    f"CUDA {p.major}.{p.minor} | "
+                    f"{p.multi_processor_count} SM")
+                # rprint(f"  GPU {i}: [cyan]{p.name}[/cyan] | {vram:.1f}GB VRAM | "
+                #        f"CUDA {p.major}.{p.minor} | "
+                #        f"{p.multi_processor_count} SM | "
+                #        f"{p.max_threads_per_block} thread/block")
     except ImportError:
         rprint("  [red]PyTorch non installato[/red]")
 
