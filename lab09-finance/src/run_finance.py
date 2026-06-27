@@ -355,6 +355,7 @@ def main():
         ax2.axhline(1.0, color="gray", linestyle="--", linewidth=1, label="Baseline (1x)")
         ax2.set_title("Speedup GPU vs CPU")
         ax2.set_ylabel("Speedup (x)")
+        ax2.set_xticks(range(len(names)))
         ax2.set_xticklabels(names, rotation=15, ha="right")
         ax2.legend()
         ax2.grid(axis="y", alpha=0.3)
