@@ -55,11 +55,11 @@ Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
 
 | Algoritmo | CPU (ms) | GPU (ms) | Speedup |
 |-----------|----------|----------|---------|
-| FFT-1D | 150.84 | 0.21 | **718.8x** |
-| FFT-2D | 949.23 | 1.39 | **683.5x** |
-| MatMul (8192×8192) | 1070.71 | 32.06 | **33.4x** — 34.4 TFLOPS (42% del picco) |
-| Stencil-2D (CuPy) | 105.95 | 1.49 | **71.1x** |
-| Stencil-2D (Numba shared mem) | — | — | in corso di validazione |
+| FFT-1D | 157.57 | 0.21 | **748.7x** |
+| FFT-2D | 985.67 | 1.39 | **709.4x** |
+| MatMul (8192×8192) | 1119.62 | 32.16 | **34.8x** — 34.4 TFLOPS (42% del picco) |
+| Stencil-2D (CuPy) | 109.38 | 1.50 | **72.9x** |
+| Stencil-2D (Numba shared mem) | 108.09 | 0.75 | **143.6x** |
 
 ![LAB 01 — Numerical: CPU vs GPU](outputs/lab01_benchmark.png)
 
