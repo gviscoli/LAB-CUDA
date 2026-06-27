@@ -76,18 +76,33 @@ Il grafico comparativo viene salvato in `lab08-sorting/outputs/lab08_benchmark.p
 
 ---
 
-## Risultati attesi
+## Risultati misurati
 
-Hardware di riferimento: Intel Core i9 | RTX 4080 16GB | Windows 11
+Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
 
-| Primitiva | N | Speedup atteso | Note |
-|-----------|---|----------------|------|
-| Radix Sort | 50M float32 | ~10-30x | CUB radix sort altamente ottimizzato |
-| Prefix Scan | 100M int32 | ~20-60x | Blelloch work-efficient scan |
-| Histogram | 100M float32, 1024 bin | ~10-40x | Dipende dalla distribuzione dati |
-| Reduction | 100M float32 | ~15-80x | Warp shuffle elimina latenza shared mem |
+### CPU vs GPU — Primitives benchmark
 
-Gli speedup variano significativamente con la dimensione del problema: al di sotto di ~1M elementi il trasferimento dati CPU↔GPU domina e lo speedup puo' essere negativo.
+| Primitiva | N | CPU (ms) | GPU (ms) | Speedup |
+|-----------|---|----------|----------|---------|
+| Radix Sort | 50M float32 | 309.72 | 4.11 | **75.4x** |
+| Prefix Scan | 100M int32 | 419.44 | 5.31 | **79.0x** |
+| Histogram | 100M float32, 1024 bin | 435.38 | 44.46 | **9.8x** |
+| Reduction (CuPy) | 100M float32 | 42.78 | 0.65 | **66.3x** |
+| Reduction (Numba) | 100M float32 | 42.78 | 1.31 | **32.7x** |
+
+L'Histogram (9.8x) è molto più lento degli altri per via dei conflitti sugli `atomicAdd`: con 1024 bin e 100M elementi gaussiani, i bin centrali ricevono milioni di write concorrenti che si serializzano. Radix Sort e Prefix Scan saturano la bandwidth GPU senza contention.
+
+### Scaling Analysis — Radix Sort GPU vs CPU
+
+| N | CPU (ms) | GPU (ms) | Speedup | Memoria GPU |
+|---|----------|----------|---------|-------------|
+| 1M | 4.2 | 0.1 | 31.2x | 4 MB |
+| 10M | 52.8 | 1.1 | 48.9x | 38 MB |
+| 50M | 315.0 | 7.9 | 39.8x | 191 MB |
+| 100M | 660.3 | 99.0 | 6.7x | 381 MB |
+| 500M | 3999.7 | 42.4 | **94.2x** | 1907 MB |
+
+Il calo anomalo a N=100M (6.7x) è causato dalla frammentazione del memory pool CuPy dopo gli allocation precedenti: Thrust necessita di un buffer di lavoro 2× la dimensione dell'input, che a 381MB può trovarsi su pagine non contigue. A N=500M il pool è già "caldo" e la GPU lavora in piena saturazione.
 
 ---
 
