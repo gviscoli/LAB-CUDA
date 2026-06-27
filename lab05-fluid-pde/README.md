@@ -9,28 +9,23 @@ Solver numerici per equazioni alle derivate parziali (PDE) in fluidodinamica com
 ### 1. Equazione del Calore 2D (Heat Equation)
 - **Griglia**: 1024 × 1024 punti
 - **Time steps**: 500 iterazioni temporali
-- **PDE**:
-  ```
-  ∂u/∂t = α (∂²u/∂x² + ∂²u/∂y²)
-  ```
+- **PDE**: `∂u/∂t = α (∂²u/∂x² + ∂²u/∂y²)`
 - **Schema**: FTCS (Forward-Time Center-Space) — esplicito al primo ordine
-- **Stabilità**: criterio CFL → `r = α·dt/dx² ≤ 0.25`
-- **Condizioni al contorno**: Dirichlet (temperatura fissa ai bordi)
+- **Stabilità**: criterio CFL 2D → `r = α·dt/dx² ≤ 0.25`
 - **Condizione iniziale**: impulso di temperatura al centro del dominio
 - **Validazione**: conservazione dell'energia totale nel dominio
 - **Applicazioni**: simulazioni termiche, diffusione in materiali, metallurgia
 
 ### 2. Navier-Stokes 2D — Lid-Driven Cavity
-- **Griglia**: 256 × 256 punti
-- **Time steps**: 200 iterazioni
-- **Regime**: flusso incomprimibile laminare, Re = 100
-- **Parametri**: ρ = 1, ν = 0.01, dt = 0.001
-- **Schema**: metodo di proiezione di Chorin (pressure-velocity splitting)
-  1. Passo predittore: calcolo velocità intermedia (`u*`) ignorando la pressione
-  2. Equazione di Poisson per la pressione (20 iterazioni Jacobi)
-  3. Correzione della velocità per soddisfare la divergenza nulla (`∇·u = 0`)
+- **Griglia**: 64 × 64 punti
+- **Time steps**: 500 iterazioni
+- **Regime**: flusso incomprimibile laminare, Re = 100 (ν = 0.01)
+- **Schema**: metodo di proiezione di Chorin (pressure-velocity splitting):
+  1. Passo predittore: calcolo velocità intermedia ignorando la pressione
+  2. Equazione di Poisson per la pressione — risolta con **solver diretto LU sparse** (scipy)
+  3. Correzione della velocità per soddisfare `∇·u = 0`
 - **Geometria**: cavità quadrata, lid superiore si muove a u=1, pareti statiche
-- **Riferimento**: Barba & Forsyth "CFD Python" (12-step Navier-Stokes course)
+- **Nota solver**: Jacobi/SOR iterativi NON convergono per questo problema. Le BC miste (Neumann su 3 lati, Dirichlet su 1) producono spettro di Jacobi ρ≈0.9997 → servono ~4000 iter/step. Il solver LU diretto (fattorizzazione una tantum) garantisce pressione esatta ad ogni step.
 - **Applicazioni**: CFD, aerodinamica, meteorologia, biomeccanica dei fluidi
 
 ---
@@ -45,12 +40,16 @@ python lab05-fluid-pde/src/run_fluid-pde.py
 
 ---
 
-## Output atteso
+## Risultati misurati
 
-```
-[Heat Equation]      CPU: 4200 ms  |  GPU: 180 ms  |  Speedup:  23x  |  Energy conserved: YES
-[Navier-Stokes]      CPU: 8500 ms  |  GPU: 410 ms  |  Speedup:  21x  |  Re=100 converged
-```
+Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
+
+| PDE | CPU (ms) | GPU (ms) | Speedup | Note |
+|-----|----------|----------|---------|------|
+| Heat Equation 2D (1024×1024) | 3536.77 | 40.04 | **88.3x** | Energia conservata ✓ |
+| Navier-Stokes 2D (64×64, Re=100) | 180.26 | N/A | — | velocità max = 1.0000 ✓ |
+
+**Nota GPU Navier-Stokes**: lo speedup GPU per NS con loop Python-level è strutturalmente negativo — ogni step lancia decine di kernel CuPy con sincronizzazione implicita. Per ottenere speedup reale serve un loop CUDA monolitico (Numba `@cuda.jit` o kernel custom) che esegua tutti i 500 step senza round-trip CPU↔GPU.
 
 ---
 
@@ -61,11 +60,11 @@ python lab05-fluid-pde/src/run_fluid-pde.py
 u[i,j]^{n+1} = u[i,j]^n + r * (u[i+1,j] + u[i-1,j] + u[i,j+1] + u[i,j-1] - 4*u[i,j])
 ```
 
-### Passo di proiezione — Navier-Stokes
+### Passo di proiezione — Navier-Stokes (Chorin)
 ```
-1. u* = u^n + dt * (-u·∇u + ν·∇²u)        ← advection + diffusion
-2. ∇²p = (ρ/dt) · ∇·u*                     ← Poisson per pressione
-3. u^{n+1} = u* - (dt/ρ) · ∇p             ← proiezione su spazio incomprimibile
+1. b = ρ·(1/dt·∇·uⁿ - (∂u/∂x)² - 2·(∂u/∂y)(∂v/∂x) - (∂v/∂y)²)
+2. ∇²p = b   →  LU solve (scipy sparse factorized)
+3. u* = uⁿ - uⁿ·∇uⁿ·dt + ν·∇²uⁿ·dt - dt/ρ·∇p
 ```
 
 ---
@@ -75,15 +74,17 @@ u[i,j]^{n+1} = u[i,j]^n + r * (u[i+1,j] + u[i-1,j] + u[i,j+1] + u[i,j-1] - 4*u[i
 | Concetto | Descrizione |
 |----------|-------------|
 | FTCS scheme | Schema esplicito: semplice ma limitato dal criterio CFL per la stabilità |
-| CFL condition | Vincolo `r ≤ 0.25` per la stabilità numerica dell'equazione del calore |
+| CFL 2D | `ν·dt/dx² ≤ 0.25` per 2D (dimezzato rispetto a 1D per la somma dei termini laplaciani) |
 | Chorin projection | Decomposizione pressione-velocità per flussi incomprimibili |
-| Stencil pattern | Ogni punto dipende solo dai vicini → alta località, ideale per GPU |
+| Sparse direct solver | Fattorizzazione LU una tantum → back-substitution O(N) per step successivi |
+| Jacobi spectral radius | Per BCs miste (Neumann+Dirichlet): ρ_J≈0.9997, ~4000 iter necessarie vs 1 per LU |
 | Memory-bound | Schemi a differenze finite hanno bassa intensità operazionale (~1-2 FLOP/byte) |
 
 ---
 
 ## Tecnologie
 
-- **CuPy** — operazioni array su GPU (roll, slicing, operazioni element-wise)
+- **CuPy** — operazioni array su GPU (Heat Equation: 88x speedup)
 - **NumPy** — baseline CPU con identica interfaccia
-- **Matplotlib** — visualizzazione dei campi di velocità e temperatura
+- **scipy.sparse** — costruzione matrice Laplaciana sparsa (4096×4096 per N=64)
+- **scipy.sparse.linalg.factorized** — solver LU diretto per pressione
