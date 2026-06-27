@@ -112,12 +112,12 @@ def lab_black_scholes(N: int = 10_000_000):
             cp.cuda.Stream.null.synchronize()
             return price
 
-        r = benchmark(cpu_fn, gpu_fn, name="Black-Scholes",
-                      problem_size=N, warmup=1, runs=3)
+        result = benchmark(cpu_fn, gpu_fn, name="Black-Scholes",
+                           problem_size=N, warmup=1, runs=3)
         price = gpu_fn()
         rprint(f"  Prezzo opzione (GPU): [green]${price:.4f}[/green]")
-        rprint(f"  {r}")
-        return r
+        rprint(f"  {result}")
+        return result
 
     except ImportError:
         with CPUTimer() as t:
