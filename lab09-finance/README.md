@@ -116,15 +116,40 @@ Il plot viene salvato automaticamente in `lab09-finance/outputs/lab09_benchmark.
 
 ---
 
-## Risultati attesi
+## Risultati misurati
 
 Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
 
-| Algoritmo | CPU (ms) | GPU (ms) | Speedup atteso | Note |
-|-----------|----------|----------|----------------|------|
-| Portfolio-VaR | ~3000 | ~30–60 | **~50–100x** | Bottleneck: RNG + matmul |
-| Greeks-MC | ~50000 | ~600 | **~80–100x** | 252 step × 10M traiettorie |
-| ImpVol-Surface | ~60000 | ~1000 | **~50–80x** | 28 MC runs in sequenza |
+### CPU vs GPU
+
+| Algoritmo | CPU (ms) | GPU (ms) | Speedup |
+|-----------|----------|----------|---------|
+| Portfolio-VaR (5M sim, 100 asset) | 9,839 | 157 | **62.7x** |
+| Greeks-MC (10M traiettorie, 252 step) | 57,675 | 853 | **67.6x** |
+| ImpVol-Surface (28 celle × 1M sim) | 143,424 | 1,516 | **94.6x** |
+
+La volatility surface da sola richiederebbe **2.4 minuti** su CPU, **1.5 secondi** su GPU.
+
+### Valori finanziari calcolati
+
+**Portfolio VaR** (100 asset correlati, Cholesky):
+- VaR 95%: **−0.2522%** (perdita massima giornaliera nel 95% degli scenari)
+- CVaR 95%: **−0.3260%** (perdita media nei casi peggiori)
+
+**Options Greeks** (call, S₀=100, K=105, σ=0.20, T=1, r=0.05):
+- Prezzo: **$8.02** | Delta: **0.5469** | Gamma: **0.0322**
+- Delta ≈ 0.55 atteso per call leggermente OTM — corretto
+
+**Implied Vol Surface** — prezzi call GPU ($):
+
+| T \ K | K=85 | K=90 | K=95 | K=100 | K=105 | K=110 | K=115 |
+|-------|------|------|------|-------|-------|-------|-------|
+| T=0.25 | 16.22 | 11.67 | 7.71 | 4.60 | 2.48 | 1.19 | 0.51 |
+| T=0.50 | 17.64 | 13.51 | 9.88 | 6.88 | 4.58 | 2.92 | 1.76 |
+| T=1.00 | 20.49 | 16.69 | 13.35 | 10.43 | 8.02 | 6.04 | 4.46 |
+| T=2.00 | 25.43 | 22.04 | 18.94 | 16.14 | 13.66 | 11.44 | 9.59 |
+
+Prezzi decrescenti con lo strike (ITM→OTM), crescenti con la scadenza — comportamento Black-Scholes corretto.
 
 ---
 
