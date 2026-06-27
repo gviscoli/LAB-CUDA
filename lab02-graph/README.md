@@ -48,15 +48,17 @@ python lab02-graph/src/run_graph.py
 
 ---
 
-## Output atteso
+## Risultati misurati
 
-```
-[BFS]                 CPU: 380 ms  |  GPU:  42 ms  |  Speedup:  9x
-[PageRank]            CPU: 620 ms  |  GPU:  55 ms  |  Speedup: 11x
-[Betweenness approx]  CPU: 850 ms  |  GPU:  90 ms  |  Speedup:  9x
-```
+Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11 — grafo 50.000 nodi
 
-> Gli algoritmi su grafi sono tipicamente **memory-bound**: il vantaggio GPU dipende dalla sparsità e dalla saturazione della banda di memoria.
+| Algoritmo | CPU (ms) | GPU (ms) | Speedup |
+|-----------|----------|----------|---------|
+| BFS | 11.15 | 1.39 | **8.0x** |
+| PageRank (50 iter.) | 29.56 | 6.97 | **4.2x** |
+| Betweenness Centrality | 2340.95 | N/A | — (solo CPU) |
+
+> Gli algoritmi su grafi sono tipicamente **memory-bound**: il vantaggio GPU è contenuto (4–8×) perché la bassa intensità operazionale non satura il picco computazionale ma la banda di memoria. Per speedup elevati usare cuGraph (RAPIDS).
 
 ---
 

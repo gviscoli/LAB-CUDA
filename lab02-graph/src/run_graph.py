@@ -215,9 +215,10 @@ def main():
         )
     console.print(table)
 
-    rprint("\n[dim]💡 Per GPU graph analytics avanzato installa cuGraph (RAPIDS):[/dim]")
-    rprint("[dim]   conda install -c rapidsai -c conda-forge cugraph cuda-version=12.4[/dim]")
-    rprint("[dim]   Docs: https://docs.rapids.ai/api/cugraph/stable/[/dim]")
+    rprint("\n[dim]💡 cuGraph (RAPIDS) offre BFS/PageRank GPU nativo con speedup 10-100x.[/dim]")
+    rprint("[dim]   ⚠️  RAPIDS non supporta Windows nativo — richiede Linux o WSL2.[/dim]")
+    rprint("[dim]   Su Linux/WSL2: pip install cugraph-cu12 --extra-index-url https://pypi.nvidia.com[/dim]")
+    rprint("[dim]   Alternativa zero-setup: Google Colab con GPU runtime (RAPIDS preinstallato).[/dim]")
 
 
 if __name__ == "__main__":
