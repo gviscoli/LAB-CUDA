@@ -40,12 +40,12 @@ C:\DATI\Sviluppo\LAB-CUDA\
 
 | Lab | Dominio | Algoritmi | Tecnologie |
 |-----|---------|-----------|------------|
-| **01** | Numerical | FFT, BLAS, Stencil 2D/3D | CuPy, Numba |
-| **02** | Graph | BFS, PageRank, SSSP | CuPy, cuGraph |
-| **03** | Monte Carlo | π, Black-Scholes, Ising | CuPy random, Numba |
-| **04** | ML Kernels | MatMul, Conv2D, Attention | Numba CUDA, Triton |
-| **05** | Fluid/PDE | Heat eq., Navier-Stokes 2D | CuPy, Numba stencil |
-| **06** | Benchmark | Roofline model, scaling | tutti i precedenti |
+| [**01** — Numerical](lab01-numerical/README.md) | Numerical | FFT 1D/2D, DGEMM, Stencil 2D | CuPy, Numba CUDA |
+| [**02** — Graph](lab02-graph/README.md) | Graph | BFS, PageRank, Betweenness | CuPy sparse, SciPy |
+| [**03** — Monte Carlo](lab03-montecarlo/README.md) | Monte Carlo | π, Black-Scholes, Ising 2D | CuPy random, Numba |
+| [**04** — ML Kernels](lab04-ml-kernels/README.md) | ML Kernels | MatMul tiled, Conv2D, Attention | Numba CUDA, PyTorch, cuDNN |
+| [**05** — Fluid/PDE](lab05-fluid-pde/README.md) | Fluid/PDE | Heat Equation, Navier-Stokes 2D | CuPy, NumPy |
+| [**06** — Benchmark](lab06-benchmark/README.md) | Benchmark | Roofline model, scaling analysis | tutti i precedenti |
 
 ---
 
