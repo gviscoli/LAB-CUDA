@@ -34,12 +34,16 @@ C:\DATI\Sviluppo\LAB-CUDA\
 ├── lab06-benchmark/                 ← Confronto CPU vs GPU vs HPC
 ├── lab07-nbody/                     ← N-Body gravitazionale O(N²) + tiled CUDA
 ├── lab08-sorting/                   ← Radix sort, Prefix scan, Histogram
-└── lab09-finance/                   ← Portfolio VaR, Greeks MC, Volatility surface
+├── lab09-finance/                   ← Portfolio VaR, Greeks MC, Volatility surface
+├── lab10-imgproc/                   ← Gaussian Blur, Sobel, Bilateral Filter
+├── lab11-sparse/                    ← SpMV, Conjugate Gradient, PageRank sparse
+├── lab12-bio/                       ← Smith-Waterman, K-mer, Edit Distance
+└── lab13-inference/                 ← INT8 MatMul, BatchNorm, Softmax, LayerNorm
 ```
 
 ---
 
-## I 9 Lab
+## I 13 Lab
 
 | Lab | Dominio | Algoritmi | Tecnologie |
 |-----|---------|-----------|------------|
@@ -52,6 +56,10 @@ C:\DATI\Sviluppo\LAB-CUDA\
 | [**07** — N-Body](lab07-nbody/README.md) | Fisica | N-Body O(N²), tiled CUDA kernel | CuPy, Numba CUDA |
 | [**08** — Sorting](lab08-sorting/README.md) | Primitive | Radix sort, Prefix scan, Histogram | CuPy, Numba |
 | [**09** — Finance](lab09-finance/README.md) | Finanza | Portfolio VaR, Greeks MC, Vol surface | CuPy, SciPy |
+| [**10** — ImgProc](lab10-imgproc/README.md) | Image | Gaussian Blur, Sobel, Bilateral | CuPy, Numba CUDA, cupyx |
+| [**11** — Sparse](lab11-sparse/README.md) | Sparse LA | SpMV, CG solver, PageRank | CuPy sparse, cupyx |
+| [**12** — Bio](lab12-bio/README.md) | Genomica | Smith-Waterman, K-mer, Edit dist. | CuPy, Numba CUDA |
+| [**13** — Inference](lab13-inference/README.md) | DL Inference | INT8 MatMul, BatchNorm, Softmax | CuPy, Numba CUDA |
 
 ---
 
