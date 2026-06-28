@@ -348,8 +348,15 @@ def lab_spmv_scaling():
     """
     rprint("\n[bold]Scaling Analysis — SpMV GPU vs CPU[/bold]")
 
-    sizes = [10_000, 50_000, 100_000, 200_000, 500_000]
-    density = 0.001
+    # density decrescente per evitare OOM/pagefile su taglie grandi:
+    # N=500K con density=0.001 → 250M NNZ → ~5GB RAM temporanea
+    configs = [
+        (10_000,  0.001),
+        (50_000,  0.001),
+        (100_000, 0.001),
+        (200_000, 0.0005),
+        (500_000, 0.0001),  # NNZ ≈ 25M → ~200MB, gestibile
+    ]
 
     table = Table(title="Scaling SpMV: SciPy CSR vs cuSPARSE", header_style="bold magenta")
     table.add_column("N", justify="right", style="cyan")
@@ -363,7 +370,7 @@ def lab_spmv_scaling():
         import cupy as cp
         import cupyx.scipy.sparse as cpsp
 
-        for N in sizes:
+        for N, density in configs:
             A_scipy = make_sparse_csr(N, density=density)
             x = np.random.rand(N).astype(np.float32)
             A_gpu = cpsp.csr_matrix(A_scipy)
