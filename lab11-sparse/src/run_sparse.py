@@ -40,8 +40,9 @@ def make_sparse_csr(N: int, density: float = 0.001, symmetric: bool = False, xp=
     """
     from scipy.sparse import random as sp_random, eye as sp_eye
     nnz_per_row = max(1, int(density * N))
+    # default_rng usa reservoir sampling O(k) invece di O(N²) del vecchio np.random.choice
     A = sp_random(N, N, density=density, format="csr", dtype=np.float32,
-                  random_state=42)
+                  random_state=np.random.default_rng(42))
     if symmetric:
         A = A + A.T + sp_eye(N, dtype=np.float32) * float(N * density * 2 + 1)
     else:
@@ -55,7 +56,7 @@ def make_sparse_csr(N: int, density: float = 0.001, symmetric: bool = False, xp=
 # 1. SpMV — Sparse Matrix-Vector Multiplication
 # ──────────────────────────────────────────────────────────────
 
-def lab_spmv(N: int = 200_000, density: float = 0.0005):
+def lab_spmv(N: int = 50_000, density: float = 0.001):
     """
     Moltiplica matrice sparsa (N×N, formato CSR) per vettore denso.
     y = A · x     dove A e' sparsa, x e y sono densi.
