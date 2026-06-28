@@ -88,15 +88,35 @@ Il plot viene salvato in `lab10-imgproc/outputs/lab10_benchmark.png`.
 
 ---
 
-## Risultati attesi
+## Risultati misurati
 
 Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
 
-| Algoritmo | Dimensione | Speedup atteso | Note |
-|-----------|-----------|----------------|------|
-| Gaussian Blur | 4096×4096 | ~20–60x | Bandwidth-bound, separabile |
-| Sobel | 4096×4096 | ~15–40x | Fused kernel elimina un pass |
-| Bilateral Filter | 512×512 | ~30–80x | O(N²×r²), molto parallelo |
+### CPU vs GPU — benchmark principale
+
+| Algoritmo | Dimensione | CPU (ms) | GPU (ms) | Speedup |
+|-----------|-----------|----------|----------|---------|
+| Gaussian Blur (CuPy) | 4096×4096 | 431.96 | 2.23 | **194.0x** |
+| Gaussian Blur (Numba) | 4096×4096 | 431.96 | 1.62 | **267.0x** |
+| Sobel (CuPy) | 4096×4096 | 583.41 | 60.50 | **9.6x** |
+| Sobel (Numba fused) | 4096×4096 | 583.41 | 0.30 | **1924.8x** |
+| Bilateral Filter | 512×512 | 273.28 | 11.04 | **24.8x** |
+
+**Nota Sobel**: il kernel CuPy chiama `sobel_x` + `sobel_y` + `hypot` — 3 kernel separati con 3 round-trip DRAM. Il kernel Numba fused legge l'immagine una sola volta e calcola entrambi i gradienti + magnitude in un unico pass → **200× più veloce di CuPy** sulla stessa GPU.
+
+**Nota Gaussian**: il kernel Numba separabile (267x) supera cupyx (194x) perché i due pass 1D (7 operazioni per pixel ciascuno) saturano meglio i warp rispetto al kernel 2D generico di cupyx.
+
+### Scaling Analysis — Gaussian Blur
+
+| Risoluzione | CPU (ms) | GPU (ms) | Speedup | Mem (MB) |
+|------------|----------|----------|---------|---------|
+| 256×256 | 0.7 | 0.2 | 3.1x | 0.2 |
+| 512×512 | 3.1 | 0.5 | 6.3x | 1.0 |
+| 1024×1024 | 17.3 | 0.4 | 48.8x | 4.0 |
+| 2048×2048 | 105.5 | 1.9 | 56.2x | 16.0 |
+| 4096×4096 | 578.2 | 13.8 | 42.0x | 64.0 |
+
+Il break-even CPU/GPU è intorno a **512×512**. Il calo da 56x (2048²) a 42x (4096²) è dovuto alla pressione sulla L2 cache GPU: a 64MB l'immagine non entra in cache e il kernel diventa bandwidth-bound.
 
 ---
 
