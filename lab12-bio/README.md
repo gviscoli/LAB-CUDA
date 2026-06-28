@@ -86,16 +86,51 @@ Il plot viene salvato in `lab12-bio/outputs/lab12_benchmark.png`.
 
 ---
 
-## Risultati attesi
+## Risultati misurati
 
 Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
 
-| Algoritmo | Dimensione | Speedup atteso | Note |
-|-----------|-----------|----------------|------|
-| Smith-Waterman (CuPy) | L=2000 | ~5–20x | Limitato dalla serialità anti-diagonale |
-| Smith-Waterman (Numba) | L=2000 | ~10–30x | Kernel nativo, meno overhead |
-| K-mer Counting | 10M bp, k=8 | ~20–60x | Memory-bound, bandwidth GPU |
-| Edit Distance batch | 10K coppie | ~30–80x | Completamente parallelo per coppia |
+| Algoritmo | Dettaglio | CPU (ms) | GPU (ms) | Speedup |
+|-----------|-----------|----------|----------|---------|
+| Smith-Waterman (CuPy) | L=2000 | 125.43 | 1943.55 | **0.1x** ← GPU più lenta |
+| Smith-Waterman (Numba) | L=2000 | 125.43 | ~112 | **1.1x** |
+| K-mer Counting | 10M bp, k=8 | 3851.30 | 23.12 | **166.6x** |
+| Edit Distance (CuPy) | 10K coppie, L=64 | 2119.19 | 8.64 | **245.3x** |
+| Edit Distance (Numba) | 10K coppie, L=64 | 2119.19 | 1.30 | **1633.4x** |
+
+**K-mer throughput GPU**: 432.5 Mbp/s
+
+### Scaling Analysis — Smith-Waterman (anti-diagonal wavefront)
+
+| L (bp) | Celle | CPU (ms) | GPU (ms) | Speedup | MCUPS GPU |
+|--------|-------|----------|----------|---------|-----------|
+| 500 | 250,000 | 16.3 | 481.2 | 0.0x | 0.5 |
+| 1,000 | 1,000,000 | 42.4 | 928.4 | 0.0x | 1.1 |
+| 2,000 | 4,000,000 | 132.1 | 1927.0 | 0.1x | 2.1 |
+| 4,000 | 16,000,000 | 451.9 | 3774.3 | 0.1x | 4.2 |
+
+Lo speedup GPU rimane costantemente < 1x su ogni dimensione L: il problema non è la dimensione della matrice ma la struttura del wavefront (kernel launch overhead fisso per ogni anti-diagonale).
+
+### Perché Smith-Waterman è più lento su GPU?
+
+La GPU CuPy impiega **1943ms contro 125ms** della CPU — 15× più lenta. Questo è un caso reale dove la GPU non è la soluzione giusta per *un singolo* allineamento:
+
+1. **Kernel launch overhead**: il wavefront ha `2×L-1 = 3999` anti-diagonali → 3999 kernel launch separati dal loop Python. Ogni lancio costa ~0.5ms di overhead → **~2000ms solo di overhead**, indipendentemente dal calcolo
+2. **Bassa occupancy iniziale**: le prime e ultime anti-diagonali hanno 1–10 elementi attivi su 10.240 thread disponibili → GPU quasi completamente idle
+3. **Dipendenza dati seriale**: ogni anti-diagonale dipende dalla precedente → impossibile sovrapporre le esecuzioni
+
+**La soluzione corretta per GPU**: non parallelizzare *dentro* un allineamento, ma allineare migliaia di sequenze *in parallelo* (batch alignment — come fa NVIDIA cuBLAST/SegAlign: 1 coppia per SM, tutte le SM in parallelo). L'Edit Distance (245–1633x) dimostra esattamente questo pattern: 10K coppie indipendenti → piena saturazione GPU.
+
+| Metrica | Smith-Waterman | Edit Distance |
+|---------|---------------|---------------|
+| Coppie | 1 (singolo allineamento) | 10,000 (batch) |
+| Parallelismo GPU | anti-diagonale (debole) | per-coppia (perfetto) |
+| Speedup | 0.1x (GPU perde) | 245–1633x (GPU vince) |
+
+### Perché Edit Distance Numba supera CuPy di 6×?
+
+- **CuPy (245x / 8.64ms)**: batch DP matriciale — tutte le 10K coppie come operazioni vettorizzate su array 3D, ma con overhead di sync e scrittura su DRAM globale
+- **Numba (1633x / 1.30ms)**: ogni thread calcola una coppia intera con `local.array` in registri GPU — nessuna scrittura DRAM intermedia, nessun sync tra thread → latency quasi zero per le dipendenze DP
 
 ---
 

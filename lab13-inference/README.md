@@ -98,17 +98,50 @@ Il plot viene salvato in `lab13-inference/outputs/lab13_benchmark.png`.
 
 ---
 
-## Risultati attesi
+## Risultati misurati
 
 Hardware: Intel Core i9 | RTX 4080 16GB | Windows 11
 
-| Algoritmo | Dimensione | Speedup atteso | Note |
-|-----------|-----------|----------------|------|
-| MatMul FP32 | 2048³ | ~30–80x | cuBLAS ottimizzato |
-| MatMul INT8 | 2048³ | ~50–120x | 4× meno DRAM reads |
-| Batch Norm | (256,512,28,28) | ~20–60x | Reduction + elementwise |
-| Softmax | 10K×32K | ~15–40x | Memory-bound, 3 pass |
-| Layer Norm | 512K×1024 | ~20–50x | Simile a BatchNorm |
+### CPU vs GPU — benchmark principale
+
+| Algoritmo | Dimensione | CPU (ms) | GPU (ms) | Speedup |
+|-----------|-----------|----------|----------|---------|
+| MatMul FP32 | M=K=N=2048 | 35.48 | 1.13 | **31.3x** — 30.29 TFLOPS |
+| MatMul INT8 | M=K=N=2048 | 59.76 | 1.30 | **46.1x** — 26.51 TFLOPS |
+| Batch Norm | (256, 512, 28, 28) | 803.07 | 13.57 | **59.2x** |
+| Softmax (CuPy) | 10K × 32K | 1422.54 | 18.10 | **78.6x** |
+| Softmax (Numba fused) | 10K × 32K | 1422.54 | 10.34 | **137.6x** |
+| Layer Norm (CuPy) | 512K × 1024 | 4395.56 | 98.19 | **44.8x** |
+| Layer Norm (Numba fused) | 512K × 1024 | 4395.56 | 918.35 | **4.8x** |
+
+**Quantizzazione INT8**: errore MAE = 2.06 (errore di approssimazione atteso con scala simmetrica)
+
+**Speedup INT8 vs FP32 su GPU**: 0.88x — pressoché identici, perché CuPy/cuBLAS usa già Tensor Cores FP16 internamente; il guadagno INT8 reale emerge con TensorRT o kernel INT8 nativi CUDA.
+
+### Scaling Analysis — FP32 vs INT8 MatMul GPU
+
+| M=N=K | FP32 (ms) | INT8 (ms) | INT8/FP32 | TFLOPS FP32 | TFLOPS INT8 |
+|-------|-----------|-----------|-----------|-------------|-------------|
+| 512 | 0.04 | 0.04 | 1.00x | 6.39 | 6.42 |
+| 1,024 | 0.11 | 0.10 | 1.05x | 19.97 | 20.97 |
+| 2,048 | 0.53 | 0.52 | 1.03x | 32.14 | 33.16 |
+| 4,096 | 3.79 | 4.98 | 0.76x | 36.28 | 27.58 |
+| 8,192 | 33.53 | 32.64 | 1.03x | 32.79 | 33.69 |
+
+Il picco di TFLOPS è ~36 TFLOPS a M=4096 (il tensore è abbastanza grande da saturare tutti i Tensor Cores). Sotto M=1024 l'overhead di lancio kernel domina.
+
+### Perché Softmax Numba supera CuPy ma LayerNorm Numba è più lento?
+
+**Softmax (137x Numba vs 78x CuPy)**: il kernel fused 3-pass su shared memory elimina 2 letture DRAM rispetto ai 3 kernel separati di CuPy (max → exp/sum → normalize). Su 10K×32K = 320M elementi questo risparmio è determinante.
+
+**LayerNorm (4.8x Numba vs 44.8x CuPy)**: 512K righe × 1024 colonne. Il kernel Numba lancia 1 blocco per riga (512K blocchi). Con solo 1024 thread per blocco e 512K blocchi, il warp scheduler satura l'overhead di context switch. CuPy usa cuDNN/cublasLt con fusione automatica e prefetch HW → batte il kernel custom su questa dimensione.
+
+| Metrica | Softmax | LayerNorm |
+|---------|---------|-----------|
+| Righe da normalizzare | 10,000 | 512,000 |
+| Colonne per riga | 32,000 | 1,024 |
+| Kernel Numba migliore? | Sì (137x vs 78x) | No (4.8x vs 44.8x) |
+| Motivo | 32K elem/riga → shared mem piena saturazione | 1K elem/riga → 512K blocchi, warp overhead > risparmio DRAM |
 
 ---
 
